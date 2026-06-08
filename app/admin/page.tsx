@@ -4,7 +4,7 @@ import { AgentRunTable } from "@/components/AgentRunTable";
 import { seedAgentRuns } from "@/lib/data/agentRuns";
 
 export const metadata: Metadata = {
-  title: "Agent runs | Eiffel Scout",
+  title: "Agent runs | where2find4you",
 };
 
 export default function AdminPage() {

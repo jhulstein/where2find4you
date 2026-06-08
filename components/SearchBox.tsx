@@ -55,7 +55,7 @@ export function SearchBox({ popularCities }: SearchBoxProps) {
           type="submit"
           className="inline-flex h-12 items-center justify-center gap-2 rounded-lg bg-teal-700 px-4 text-sm font-semibold text-white transition hover:bg-teal-800"
         >
-          Scout city
+          Find city
           <ArrowRight aria-hidden="true" size={17} />
         </button>
       </form>

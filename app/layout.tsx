@@ -4,7 +4,7 @@ import { Header } from "@/components/Header";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Eiffel Scout",
+  title: "where2find4you",
   description:
     "AI-powered city discovery for WiFi, work spots, rooftops, and hidden gems.",
   icons: {

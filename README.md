@@ -1,6 +1,6 @@
-# Eiffel Scout
+# where2find4you
 
-Eiffel Scout is an AI-powered city discovery MVP for finding free WiFi,
+where2find4you is an AI-powered city discovery MVP for finding free WiFi,
 laptop-friendly work spots, quiet cafés, libraries, hotel lobbies, and future
 rooftop or hidden-gem locations.
 

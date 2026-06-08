@@ -20,8 +20,8 @@ export async function generateMetadata({
 
   return {
     title: city
-      ? `Best WiFi and work spots in ${city.name} | Eiffel Scout`
-      : "City not found | Eiffel Scout",
+      ? `Best WiFi and work spots in ${city.name} | where2find4you`
+      : "City not found | where2find4you",
   };
 }
 

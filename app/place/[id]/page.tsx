@@ -28,7 +28,7 @@ export async function generateMetadata({
   const place = osloPlaces.find((item) => item.id === id);
 
   return {
-    title: place ? `${place.name} | Eiffel Scout` : "Place not found",
+    title: place ? `${place.name} | where2find4you` : "Place not found",
   };
 }
 
@@ -81,7 +81,7 @@ export default async function PlacePage({ params }: PlacePageProps) {
           <div className="mt-8 grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
             <div>
               <h2 className="text-lg font-semibold text-stone-950">
-                Scout summary
+                Place summary
               </h2>
               <p className="mt-3 leading-7 text-stone-700">{score.summary}</p>
               <div className="mt-6 grid gap-4 sm:grid-cols-2">

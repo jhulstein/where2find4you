@@ -20,7 +20,7 @@ export default function Home() {
               AI city scouting
             </div>
             <h1 className="max-w-2xl text-4xl font-semibold tracking-normal text-stone-950 sm:text-5xl">
-              Eiffel Scout
+              where2find4you
             </h1>
             <p className="mt-5 max-w-xl text-lg leading-8 text-stone-700">
               AI agents scouting the city for free WiFi, work spots, rooftops

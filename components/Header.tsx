@@ -11,9 +11,9 @@ export function Header() {
           </span>
           <span>
             <span className="block text-sm font-semibold leading-4 text-stone-950">
-              Eiffel Scout
+              where2find4you
             </span>
-            <span className="block text-xs text-stone-500">City discovery</span>
+            <span className="block text-xs text-stone-500">Find useful places</span>
           </span>
         </Link>
 

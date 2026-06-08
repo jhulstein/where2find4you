@@ -20,7 +20,7 @@ export default function LeafletMap({ city, places, scores }: PlaceMapProps) {
 
   const markerIcon = L.divIcon({
     className: "",
-    html: '<span class="scout-marker">ES</span>',
+    html: '<span class="scout-marker">W2</span>',
     iconAnchor: [15, 15],
     iconSize: [30, 30],
     popupAnchor: [0, -12],
