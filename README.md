@@ -1,48 +1,177 @@
-# where2find4you
+# where2find4you.com
 
-where2find4you is an AI-powered city discovery MVP for finding free WiFi,
-laptop-friendly work spots, quiet cafés, libraries, hotel lobbies, and future
-rooftop or hidden-gem locations.
+**We help people find places — and help places get found.**
 
-## Prerequisites
+where2find4you.com is an AI-powered local discovery MVP for places, services,
+experiences, restaurants, attractions, hotels, cafés, shops, marinas, activities
+and local businesses.
 
-- Node.js `>=22.13.0`
-
-## Quick Start
+## Install
 
 ```bash
 npm install
 npm run dev
 ```
 
-Then open the local URL shown in your terminal.
+## Environment
 
-## Main Routes
+Copy `.env.example` to `.env.local` and add values when you connect real services:
 
-- `/` - Home page with city search and popular cities.
-- `/city/oslo` - Seeded Oslo results with filters, cards, and a Leaflet map.
-- `/place/deichman-bjorvika` - Place detail with scores, source notes, and map.
-- `/admin` - Simulated agent runs and a mock Oslo scan button.
+```env
+NEXT_PUBLIC_SUPABASE_URL=
+NEXT_PUBLIC_SUPABASE_ANON_KEY=
+SUPABASE_SECRET_KEY=
+SUPABASE_SERVICE_ROLE_KEY=
+OPENAI_API_KEY=
+NEXT_PUBLIC_SITE_URL=https://where2find4you.com
+NEXT_PUBLIC_DONATION_URL=
+```
 
-## Data
+The MVP works with local seed data without credentials.
+`NEXT_PUBLIC_DONATION_URL` is optional. Add a Stripe, PayPal, Buy Me a Coffee
+or similar donation URL when it is ready; until then the donation button points
+to the contact page.
 
-The first MVP uses local TypeScript seed data in `lib/data`. The schema in
-`supabase/schema.sql` is compatible with Supabase/Postgres and mirrors the
-current TypeScript types.
+## Supabase
 
-No paid API keys or environment variables are required for this version.
+1. Create a Supabase project.
+2. Run `supabase/schema.sql` in the SQL editor or through migrations.
+3. Generate the seed SQL:
 
-## Useful Commands
+```bash
+npm run seed:places
+```
 
-- `npm run dev`: start local development.
-- `npm run build`: verify the Sites-compatible vinext build output.
-- `npm run lint`: run lint checks.
+4. Run `supabase/seed.sql` in the SQL editor.
+5. Copy the project API values into `.env.local` for local testing and into Vercel
+   for deployment:
 
-## Future Integrations
+```env
+NEXT_PUBLIC_SUPABASE_URL=
+NEXT_PUBLIC_SUPABASE_ANON_KEY=
+SUPABASE_SECRET_KEY=
+NEXT_PUBLIC_SITE_URL=https://where2find4you.com
+NEXT_PUBLIC_DONATION_URL=
+```
 
-TODO comments are included where real agents can plug in:
+The Supabase secret key is only used inside server routes. Do not expose it with
+a `NEXT_PUBLIC_` prefix. If your Supabase dashboard still shows legacy keys, the
+app also accepts `SUPABASE_SERVICE_ROLE_KEY`.
 
-- Google Places and OpenStreetMap ingestion.
-- OpenAI-based scoring over reviews, photos, and source notes.
-- Rooftop and view scoring.
-- Scheduled verification jobs for source freshness and opening hours.
+If you already created the tables from an older UUID-based draft schema, reset
+those MVP tables first or create a fresh Supabase project before running the
+current schema.
+
+## Production Tracking
+
+The app keeps local seed analytics for development and also writes real events
+to Supabase when `NEXT_PUBLIC_SUPABASE_URL` and either `SUPABASE_SECRET_KEY` or
+`SUPABASE_SERVICE_ROLE_KEY` are configured.
+
+Tracked MVP events:
+
+- Search records from `/search` and `/api/search`.
+- Result impressions for shown places.
+- Place profile views from the browser after the profile page loads.
+- Clicks for profile, website, map, phone, booking, claim and promote actions.
+
+To test tracking after deployment:
+
+1. Open `/search?q=quiet cafe in Oslo`.
+2. Click a result profile.
+3. Open the place website, map or phone action.
+4. In Supabase Table Editor, check `searches`, `place_impressions`,
+   `place_views` and `place_clicks`.
+
+## Main Pages
+
+- `/` - Mobile-first homepage with hero search, examples, categories and business CTA.
+- `/search` - Search results with filters, sponsored listings and sorting controls.
+- `/place/[id]` - Place profile with map, website, phone, claim and promote CTAs.
+- `/business` - Business positioning and contact placeholder.
+- `/about` - Concept and privacy explanation.
+- `/contact` - Contact form placeholder.
+
+## Admin
+
+- `/admin` - Overview dashboard with searches, impressions, clicks, views and top lists.
+- `/admin/places` - Places management and add/edit placeholder form.
+- `/admin/import` - OpenStreetMap / Overpass import form placeholder.
+- `/admin/analytics/[slug]` - Per-place analytics.
+- `/admin/leads` - High-interest places to contact for paid promotion.
+
+## API Routes
+
+- `GET /api/search?q=...`
+- `POST /api/track/impression`
+- `POST /api/track/click`
+- `POST /api/track/view`
+- `POST /api/import/osm`
+- `GET|POST /api/admin/places`
+- `GET /api/analytics/summary`
+
+## OpenAI-Ready Architecture
+
+`lib/ai/recommendPlaces.ts` contains a deterministic fallback search and clear
+TODO placement for OpenAI API intent parsing and ranking.
+
+## OpenStreetMap Import
+
+The import path uses Overpass API and does not scrape Google Maps. To test:
+
+```bash
+npm run dev
+node scripts/import-osm.mjs
+```
+
+For a first pilot, change the import area in the admin form or set environment
+variables:
+
+```bash
+IMPORT_AREA_NAME=Oslo IMPORT_LIMIT=200 node scripts/import-osm.mjs
+```
+
+## Vercel Deployment
+
+1. Push the repo to GitHub.
+2. Import the GitHub repo in Vercel as a Next.js project.
+3. Keep the default build command, which now runs:
+
+```bash
+npm run build
+```
+
+4. Add the environment variables from `.env.example` to Vercel Production and
+   Preview environments.
+5. Deploy.
+6. In Vercel, add `where2find4you.com` and `www.where2find4you.com`.
+7. Update DNS at the domain registrar according to Vercel's instructions.
+8. Set `NEXT_PUBLIC_SITE_URL=https://where2find4you.com` in Vercel and redeploy.
+
+For the existing Sites/Cloudflare workflow, use `npm run build:sites`.
+
+## Real Business MVP Launch Path
+
+1. GitHub: create a private repo, push this code, and use `main` as production.
+2. Supabase: create project, run `supabase/schema.sql`, run `npm run seed:places`,
+   then run `supabase/seed.sql`.
+3. Vercel: import from GitHub, add environment variables, deploy a preview, then
+   promote to production.
+4. Domain: add `where2find4you.com` and `www.where2find4you.com` in Vercel, then
+   apply the DNS records at the registrar.
+5. Tracking test: run the search/profile/click test above and confirm rows appear
+   in Supabase.
+
+## Responsive Testing
+
+Test these widths in browser dev tools:
+
+- 375px mobile
+- 430px large mobile
+- 768px tablet
+- 1024px small laptop/tablet landscape
+- 1440px desktop
+- 1920px large desktop
+
+Admin tables intentionally use horizontal scroll on small screens; public pages
+avoid fixed-width layouts.

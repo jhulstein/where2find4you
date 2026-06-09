@@ -1,49 +1,75 @@
-import type { Metadata } from "next";
-import { Activity, Database, Radar } from "lucide-react";
-import { AgentRunTable } from "@/components/AgentRunTable";
-import { seedAgentRuns } from "@/lib/data/agentRuns";
+import { BarChart3, Eye, MousePointerClick, Search } from "lucide-react";
+import { AdminNav } from "@/components/AdminNav";
+import { AdminTable } from "@/components/AdminTable";
+import { DashboardChart } from "@/components/DashboardChart";
+import { ResponsiveContainer } from "@/components/ResponsiveContainer";
+import { StatsCard } from "@/components/StatsCard";
+import { getAnalyticsSummary } from "@/lib/analytics";
 
-export const metadata: Metadata = {
-  title: "Agent runs | where2find4you",
-};
+export default function AdminOverviewPage() {
+  const summary = getAnalyticsSummary();
 
-export default function AdminPage() {
   return (
-    <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-      <div className="mb-7 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <p className="text-sm font-medium text-teal-800">Admin</p>
-          <h1 className="mt-1 text-3xl font-semibold tracking-normal text-stone-950 sm:text-4xl">
-            Agent runs
+    <main>
+      <ResponsiveContainer className="py-6 sm:py-8">
+        <AdminNav />
+        <div className="mb-6">
+          <p className="text-sm font-semibold text-teal-800">Admin dashboard</p>
+          <h1 className="mt-1 text-3xl font-semibold text-slate-950 sm:text-4xl">
+            Discovery analytics overview
           </h1>
         </div>
-        <p className="max-w-md text-sm leading-6 text-stone-600">
-          Simulated scouting jobs for the MVP. Real workers and scheduled jobs
-          can attach to the same shape later.
-        </p>
-      </div>
 
-      <div className="mb-5 grid gap-4 md:grid-cols-3">
-        <div className="rounded-lg border border-stone-200 bg-white p-4">
-          <Activity aria-hidden="true" size={20} className="text-teal-700" />
-          <p className="mt-3 text-sm text-stone-500">Recent runs</p>
-          <p className="text-2xl font-semibold text-stone-950">
-            {seedAgentRuns.length}
-          </p>
-        </div>
-        <div className="rounded-lg border border-stone-200 bg-white p-4">
-          <Radar aria-hidden="true" size={20} className="text-blue-700" />
-          <p className="mt-3 text-sm text-stone-500">Primary city</p>
-          <p className="text-2xl font-semibold text-stone-950">Oslo</p>
-        </div>
-        <div className="rounded-lg border border-stone-200 bg-white p-4">
-          <Database aria-hidden="true" size={20} className="text-amber-700" />
-          <p className="mt-3 text-sm text-stone-500">Data mode</p>
-          <p className="text-2xl font-semibold text-stone-950">Seeded</p>
-        </div>
-      </div>
+        <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <StatsCard label="Total searches" value={summary.totalSearches} icon={Search} />
+          <StatsCard label="Place impressions" value={summary.totalImpressions} icon={Eye} />
+          <StatsCard label="Place clicks" value={summary.totalClicks} icon={MousePointerClick} />
+          <StatsCard label="Place views" value={summary.totalViews} icon={BarChart3} />
+        </section>
 
-      <AgentRunTable initialRuns={seedAgentRuns} />
+        <section className="mt-6 grid gap-4 xl:grid-cols-2">
+          <DashboardChart
+            title="Top search queries"
+            data={summary.topSearchQueries.map((item) => ({ label: item.query, value: item.count }))}
+          />
+          <DashboardChart
+            title="Top categories"
+            data={summary.topCategories.map((item) => ({ label: item.category, value: item.count }))}
+          />
+        </section>
+
+        <section className="mt-6 grid gap-4 xl:grid-cols-2">
+          <AdminTable
+            headers={["Top by impressions", "Category", "Impressions", "Clicks", "CTR"]}
+            rows={summary.topByImpressions.map((item) => [
+              item.place.name,
+              item.place.category.replace("-", " "),
+              item.impressions,
+              item.clicks,
+              `${item.ctr}%`,
+            ])}
+          />
+          <AdminTable
+            headers={["Top by clicks", "Sponsored", "Impressions", "Clicks", "Action"]}
+            rows={summary.topByClicks.map((item) => [
+              item.place.name,
+              item.place.isSponsored ? "Yes" : "No",
+              item.impressions,
+              item.clicks,
+              item.suggestedAction,
+            ])}
+          />
+        </section>
+
+        <section className="mt-6 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+          <h2 className="font-semibold text-slate-950">Sponsored performance summary</h2>
+          <div className="mt-4 grid gap-3 sm:grid-cols-3">
+            <StatsCard label="Sponsored places" value={summary.sponsoredSummary.places} icon={BarChart3} />
+            <StatsCard label="Sponsored impressions" value={summary.sponsoredSummary.impressions} icon={Eye} />
+            <StatsCard label="Sponsored clicks" value={summary.sponsoredSummary.clicks} icon={MousePointerClick} />
+          </div>
+        </section>
+      </ResponsiveContainer>
     </main>
   );
 }

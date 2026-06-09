@@ -7,10 +7,16 @@
   },
   "scripts": {
     "dev": "vinext dev",
-    "build": "vinext build",
-    "start": "vinext start",
+    "dev:vercel": "next dev",
+    "build": "next build --webpack",
+    "build:vercel": "next build --webpack",
+    "build:sites": "vinext build",
+    "start": "next start",
+    "start:sites": "vinext start",
     "lint": "eslint . --ignore-pattern dist --ignore-pattern .next",
-    "db:generate": "drizzle-kit generate"
+    "db:generate": "drizzle-kit generate",
+    "seed:places": "node scripts/seed-places.mjs",
+    "import:osm": "node scripts/import-osm.mjs"
   },
   "dependencies": {
     "drizzle-orm": "0.45.2",

@@ -34,6 +34,22 @@ export const cities: City[] = [
     longitude: 2.1686,
   },
   {
+    id: "city-miami",
+    name: "Miami",
+    slug: "miami",
+    country: "United States",
+    latitude: 25.7617,
+    longitude: -80.1918,
+  },
+  {
+    id: "city-san-sebastian",
+    name: "San Sebastián",
+    slug: "san-sebastian",
+    country: "Spain",
+    latitude: 43.3183,
+    longitude: -1.9812,
+  },
+  {
     id: "city-tokyo",
     name: "Tokyo",
     slug: "tokyo",
@@ -43,4 +59,42 @@ export const cities: City[] = [
   },
 ];
 
-export const popularCities = cities;
+export const popularCities = cities.slice(0, 6);
+
+export function normalizeLocation(value: string) {
+  return value
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "");
+}
+
+export function getCityBySearchTerm(value?: string | null) {
+  if (!value) {
+    return null;
+  }
+
+  const normalized = normalizeLocation(value);
+
+  return (
+    cities.find((city) => {
+      const cityName = normalizeLocation(city.name);
+      const country = normalizeLocation(city.country);
+
+      return (
+        normalized === city.slug ||
+        normalized === cityName ||
+        normalized.includes(city.slug) ||
+        normalized.includes(cityName) ||
+        normalized.includes(country)
+      );
+    }) ?? null
+  );
+}
+
+export function getCitiesWithPlaces(placeCities: string[]) {
+  const normalizedPlaceCities = new Set(placeCities.map(normalizeLocation));
+  return cities.filter((city) => normalizedPlaceCities.has(normalizeLocation(city.name)));
+}

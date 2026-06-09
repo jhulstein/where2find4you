@@ -2,172 +2,198 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import {
-  ArrowLeft,
-  CheckCircle2,
+  BarChart3,
+  Clock3,
   ExternalLink,
+  Globe2,
   MapPin,
-  MinusCircle,
+  Megaphone,
+  Phone,
+  ShieldCheck,
 } from "lucide-react";
-import { PlaceMap } from "@/components/PlaceMap";
-import { ScoreBadge } from "@/components/ScoreBadge";
-import { cities } from "@/lib/data/cities";
-import { osloPlaces, placeScoresByPlaceId } from "@/lib/data/places";
+import { SponsoredBadge } from "@/components/SponsoredBadge";
+import { PlaceViewTracker } from "@/components/PlaceViewTracker";
+import { ResponsiveContainer } from "@/components/ResponsiveContainer";
+import { TrackingButton } from "@/components/TrackingButton";
+import { TrackingLink } from "@/components/TrackingLink";
+import { getPlaceAnalytics } from "@/lib/analytics";
+import { getPlaceBySlug, samplePlaces } from "@/lib/data/places";
 
 type PlacePageProps = {
   params: Promise<{ id: string }>;
 };
 
 export function generateStaticParams() {
-  return osloPlaces.map((place) => ({ id: place.id }));
+  return samplePlaces.map((place) => ({ id: place.slug }));
 }
 
-export async function generateMetadata({
-  params,
-}: PlacePageProps): Promise<Metadata> {
+export async function generateMetadata({ params }: PlacePageProps): Promise<Metadata> {
   const { id } = await params;
-  const place = osloPlaces.find((item) => item.id === id);
+  const place = getPlaceBySlug(id);
 
   return {
-    title: place ? `${place.name} | where2find4you` : "Place not found",
+    title: place ? `${place.name} | where2find4you.com` : "Place not found",
   };
 }
 
 export default async function PlacePage({ params }: PlacePageProps) {
   const { id } = await params;
-  const place = osloPlaces.find((item) => item.id === id);
+  const place = getPlaceBySlug(id);
 
   if (!place) {
     notFound();
   }
 
-  const city = cities.find((item) => item.id === place.cityId) ?? cities[0];
-  const score = placeScoresByPlaceId[place.id];
+  const analytics = getPlaceAnalytics(place);
+  const mapUrl = `https://www.google.com/maps/search/?api=1&query=${place.latitude},${place.longitude}`;
 
   return (
-    <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-      <Link
-        href={`/city/${city.slug}`}
-        className="mb-6 inline-flex items-center gap-2 text-sm font-medium text-stone-600 transition hover:text-stone-950"
-      >
-        <ArrowLeft aria-hidden="true" size={16} />
-        Back to {city.name}
-      </Link>
+    <main>
+      <PlaceViewTracker placeId={place.id} />
+      <ResponsiveContainer className="py-6 sm:py-8">
+        <Link href="/search" className="text-sm font-semibold text-teal-800">
+          Back to search
+        </Link>
+        <section className="mt-4 grid gap-6 lg:grid-cols-[1fr_380px]">
+          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-7">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold capitalize text-slate-700">
+                {place.category.replace("-", " ")}
+              </span>
+              {place.isSponsored ? <SponsoredBadge /> : null}
+            </div>
+            <h1 className="mt-4 text-3xl font-semibold text-slate-950 sm:text-4xl">
+              {place.name}
+            </h1>
+            <p className="mt-4 max-w-3xl text-lg leading-8 text-slate-700">
+              {place.description}
+            </p>
 
-      <div className="grid gap-6 lg:grid-cols-[1fr_420px]">
-        <section className="rounded-lg border border-stone-200 bg-white p-5 sm:p-7">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-            <div>
-              <p className="text-sm font-medium text-teal-800">
-                {place.category}
+            <div className="mt-6 grid gap-3 sm:grid-cols-2">
+              <p className="flex items-start gap-2 text-sm text-slate-700">
+                <MapPin aria-hidden="true" className="mt-0.5 text-teal-700" size={18} />
+                {place.address}, {place.city}, {place.country}
               </p>
-              <h1 className="mt-1 text-3xl font-semibold tracking-normal text-stone-950 sm:text-4xl">
-                {place.name}
-              </h1>
-              <p className="mt-3 flex items-center gap-2 text-sm text-stone-600">
-                <MapPin aria-hidden="true" size={16} />
-                {place.address}
+              <p className="flex items-start gap-2 text-sm text-slate-700">
+                <Clock3 aria-hidden="true" className="mt-0.5 text-teal-700" size={18} />
+                {place.openingHours}
               </p>
             </div>
-            <ScoreBadge label="Total" score={score.totalScore} size="large" />
+
+            <div className="mt-6 flex flex-wrap gap-2">
+              {place.tags.map((tag) => (
+                <span key={tag} className="rounded-full bg-slate-50 px-3 py-1.5 text-sm text-slate-600">
+                  {tag}
+                </span>
+              ))}
+            </div>
+
+            <div className="mt-7 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              <TrackingLink
+                href={mapUrl}
+                placeId={place.id}
+                clickType="map"
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex min-h-12 items-center justify-center gap-2 rounded-lg bg-teal-700 px-4 text-sm font-semibold text-white hover:bg-teal-800"
+              >
+                <MapPin aria-hidden="true" size={17} />
+                Map
+              </TrackingLink>
+              {place.websiteUrl ? (
+                <TrackingLink
+                  href={place.websiteUrl}
+                  placeId={place.id}
+                  clickType="website"
+                  className="inline-flex min-h-12 items-center justify-center gap-2 rounded-lg border border-slate-200 px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                >
+                  <Globe2 aria-hidden="true" size={17} />
+                  Website
+                </TrackingLink>
+              ) : null}
+              {place.phone ? (
+                <TrackingLink
+                  href={`tel:${place.phone}`}
+                  placeId={place.id}
+                  clickType="phone"
+                  className="inline-flex min-h-12 items-center justify-center gap-2 rounded-lg border border-slate-200 px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                >
+                  <Phone aria-hidden="true" size={17} />
+                  Phone
+                </TrackingLink>
+              ) : null}
+              <TrackingButton
+                placeId={place.id}
+                clickType="booking"
+                className="inline-flex min-h-12 items-center justify-center gap-2 rounded-lg border border-slate-200 px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+              >
+                <ExternalLink aria-hidden="true" size={17} />
+                Booking
+              </TrackingButton>
+            </div>
+
+            <div className="mt-7 grid gap-3 sm:grid-cols-3">
+              <TrackingButton
+                placeId={place.id}
+                clickType="claim"
+                className="min-h-12 rounded-lg bg-slate-950 px-4 text-sm font-semibold text-white"
+              >
+                Claim this place
+              </TrackingButton>
+              <TrackingButton
+                placeId={place.id}
+                clickType="promote"
+                className="min-h-12 rounded-lg bg-teal-700 px-4 text-sm font-semibold text-white"
+              >
+                Promote this place
+              </TrackingButton>
+              <TrackingButton
+                placeId={place.id}
+                clickType="profile"
+                className="min-h-12 rounded-lg border border-slate-200 px-4 text-sm font-semibold text-slate-700"
+              >
+                Request analytics report
+              </TrackingButton>
+            </div>
           </div>
 
-          <div className="mt-7 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            <ScoreBadge label="WiFi" score={score.wifiScore} />
-            <ScoreBadge label="Work" score={score.workScore} />
-            <ScoreBadge label="Quiet" score={score.quietScore} />
-            <ScoreBadge label="Confidence" score={score.confidenceScore} />
-          </div>
-
-          <div className="mt-8 grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
-            <div>
-              <h2 className="text-lg font-semibold text-stone-950">
-                Place summary
-              </h2>
-              <p className="mt-3 leading-7 text-stone-700">{score.summary}</p>
-              <div className="mt-6 grid gap-4 sm:grid-cols-2">
-                <div>
-                  <h3 className="flex items-center gap-2 font-semibold text-stone-950">
-                    <CheckCircle2
-                      aria-hidden="true"
-                      size={18}
-                      className="text-teal-700"
-                    />
-                    Pros
-                  </h3>
-                  <ul className="mt-3 space-y-2 text-sm leading-6 text-stone-700">
-                    {score.pros.map((pro) => (
-                      <li key={pro}>{pro}</li>
-                    ))}
-                  </ul>
+          <aside className="space-y-4">
+            <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+              <ShieldCheck aria-hidden="true" size={24} className="text-teal-700" />
+              <h2 className="mt-3 font-semibold text-slate-950">Source</h2>
+              <p className="mt-2 text-sm leading-6 text-slate-600">
+                {place.source} {place.sourceId ? `• ${place.sourceId}` : ""}
+              </p>
+            </div>
+            <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+              <BarChart3 aria-hidden="true" size={24} className="text-teal-700" />
+              <h2 className="mt-3 font-semibold text-slate-950">Discovery stats</h2>
+              <div className="mt-4 grid grid-cols-3 gap-2 text-center">
+                <div className="rounded-lg bg-slate-50 p-2">
+                  <p className="font-semibold">{analytics.impressions}</p>
+                  <p className="text-xs text-slate-500">Impr.</p>
                 </div>
-                <div>
-                  <h3 className="flex items-center gap-2 font-semibold text-stone-950">
-                    <MinusCircle
-                      aria-hidden="true"
-                      size={18}
-                      className="text-amber-700"
-                    />
-                    Cons
-                  </h3>
-                  <ul className="mt-3 space-y-2 text-sm leading-6 text-stone-700">
-                    {score.cons.map((con) => (
-                      <li key={con}>{con}</li>
-                    ))}
-                  </ul>
+                <div className="rounded-lg bg-slate-50 p-2">
+                  <p className="font-semibold">{analytics.clicks}</p>
+                  <p className="text-xs text-slate-500">Clicks</p>
+                </div>
+                <div className="rounded-lg bg-slate-50 p-2">
+                  <p className="font-semibold">{analytics.ctr}%</p>
+                  <p className="text-xs text-slate-500">CTR</p>
                 </div>
               </div>
             </div>
-
-            <aside className="rounded-lg border border-stone-200 bg-stone-50 p-4">
-              <h2 className="font-semibold text-stone-950">Source notes</h2>
-              <ul className="mt-3 space-y-2 text-sm leading-6 text-stone-700">
-                {score.sourceNotes.map((note) => (
-                  <li key={note}>{note}</li>
-                ))}
-              </ul>
-              <dl className="mt-5 grid gap-3 text-sm">
-                <div>
-                  <dt className="text-stone-500">Last checked</dt>
-                  <dd className="font-medium text-stone-950">
-                    {new Intl.DateTimeFormat("en", {
-                      dateStyle: "medium",
-                    }).format(new Date(score.checkedAt))}
-                  </dd>
-                </div>
-                <div>
-                  <dt className="text-stone-500">Opening hours</dt>
-                  <dd className="font-medium text-stone-950">
-                    {place.openingHours}
-                  </dd>
-                </div>
-                {place.website ? (
-                  <div>
-                    <dt className="text-stone-500">Website</dt>
-                    <dd>
-                      <a
-                        href={place.website}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="inline-flex items-center gap-1 font-medium text-teal-800 hover:text-teal-950"
-                      >
-                        Visit site
-                        <ExternalLink aria-hidden="true" size={14} />
-                      </a>
-                    </dd>
-                  </div>
-                ) : null}
-              </dl>
-            </aside>
-          </div>
+            <div className="rounded-2xl bg-slate-950 p-5 text-white shadow-sm">
+              <Megaphone aria-hidden="true" size={24} className="text-teal-300" />
+              <h2 className="mt-3 font-semibold">Visibility opportunity</h2>
+              <p className="mt-2 text-sm leading-6 text-slate-300">
+                Places with strong views and clicks can be offered sponsored
+                placement, enhanced profiles and lead generation.
+              </p>
+            </div>
+          </aside>
         </section>
-
-        <PlaceMap
-          city={city}
-          places={[place]}
-          scores={[score]}
-          heightClassName="h-[520px]"
-        />
-      </div>
+      </ResponsiveContainer>
     </main>
   );
 }
