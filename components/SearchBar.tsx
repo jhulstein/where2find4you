@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowRight, Search } from "lucide-react";
 import { exampleSearches } from "@/lib/data/exampleSearches";
@@ -23,9 +24,8 @@ export function SearchBar({
   const router = useRouter();
   const [query, setQuery] = useState(defaultValue);
 
-  function submit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const trimmed = query.trim();
+  function searchPath(searchQuery: string) {
+    const trimmed = searchQuery.trim();
     const searchParams = new URLSearchParams();
 
     if (trimmed) {
@@ -42,17 +42,26 @@ export function SearchBar({
     }
 
     const suffix = searchParams.toString();
-    router.push(suffix ? `/search?${suffix}` : "/search");
+    return suffix ? `/search?${suffix}` : "/search";
+  }
+
+  function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    router.push(searchPath(query));
   }
 
   return (
     <div className="w-full">
       <form
+        action="/search"
         onSubmit={submit}
         className={`rounded-xl border border-slate-200 bg-white p-2 shadow-sm ${
           compact ? "" : "sm:p-3"
         }`}
       >
+        {location ? <input type="hidden" name="location" value={location} /> : null}
+        {category ? <input type="hidden" name="category" value={category} /> : null}
+        {sort ? <input type="hidden" name="sort" value={sort} /> : null}
         <div className="flex flex-col gap-2 sm:flex-row">
           <label className="sr-only" htmlFor="global-search">
             Search for places
@@ -65,6 +74,7 @@ export function SearchBar({
             />
             <input
               id="global-search"
+              name="q"
               value={query}
               onChange={(event) => setQuery(event.target.value)}
               placeholder="What are you trying to find?"
@@ -88,14 +98,13 @@ export function SearchBar({
       {!compact ? (
         <div className="mt-3 flex flex-wrap gap-2">
           {exampleSearches.slice(0, 4).map((example) => (
-            <button
+            <Link
               key={example}
-              type="button"
-              onClick={() => setQuery(example)}
+              href={searchPath(example)}
               className="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-left text-sm text-slate-600 transition hover:border-teal-300 hover:bg-teal-50 hover:text-teal-900"
             >
               {example}
-            </button>
+            </Link>
           ))}
         </div>
       ) : null}

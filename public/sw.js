@@ -1,5 +1,11 @@
-const CACHE_NAME = "where2find4you-v1";
-const APP_SHELL = ["/", "/manifest.webmanifest", "/favicon.svg"];
+const CACHE_NAME = "where2find4you-v2";
+const APP_SHELL = [
+  "/manifest.webmanifest",
+  "/favicon.svg",
+  "/apple-touch-icon.png",
+  "/pwa-icon-192.png",
+  "/pwa-icon-512.png",
+];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
@@ -26,13 +32,21 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
+  const url = new URL(event.request.url);
+
+  if (url.origin !== self.location.origin || !APP_SHELL.includes(url.pathname)) {
+    return;
+  }
+
   event.respondWith(
-    fetch(event.request)
-      .then((response) => {
-        const clone = response.clone();
-        caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
-        return response;
-      })
-      .catch(() => caches.match(event.request).then((cached) => cached || caches.match("/"))),
+    caches.match(event.request).then(
+      (cached) =>
+        cached ||
+        fetch(event.request).then((response) => {
+          const clone = response.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
+          return response;
+        }),
+    ),
   );
 });
