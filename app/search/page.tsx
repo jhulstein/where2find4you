@@ -9,12 +9,14 @@ import { getPlaceAnalytics } from "@/lib/analytics";
 import { cities, getCityBySearchTerm, normalizeLocation } from "@/lib/data/cities";
 import { activePlaces } from "@/lib/data/places";
 import { recommendPlaces } from "@/lib/ai/recommendPlaces";
+import { searchOsmPlaces } from "@/lib/search/osmPlaces";
 import {
   matchesSearchFilter,
   normalizeSearchFilter,
   searchFilterOptions,
 } from "@/lib/searchFilters";
 import { createSearchRecord, logImpressions } from "@/lib/tracking";
+import type { Place } from "@/lib/types";
 
 type SearchPageProps = {
   searchParams: Promise<{
@@ -24,6 +26,30 @@ type SearchPageProps = {
     sort?: "relevance" | "popularity" | "newest";
   }>;
 };
+
+function placeMergeKey(place: Place) {
+  return [
+    place.name.trim().toLowerCase(),
+    place.city.trim().toLowerCase(),
+    place.latitude.toFixed(4),
+    place.longitude.toFixed(4),
+  ].join("-");
+}
+
+function mergePlaces(...placeGroups: Place[][]) {
+  const seen = new Set<string>();
+
+  return placeGroups.flat().filter((place) => {
+    const key = placeMergeKey(place);
+
+    if (seen.has(key)) {
+      return false;
+    }
+
+    seen.add(key);
+    return true;
+  });
+}
 
 export default async function SearchPage({ searchParams }: SearchPageProps) {
   const params = await searchParams;
@@ -38,7 +64,18 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
   const defaultFilterCity = category !== "all" ? cities[0] : null;
   const cityForSearch =
     selectedCity ?? getCityBySearchTerm(recommendation.detectedLocation) ?? defaultFilterCity;
-  const basePlaces = category === "all" ? recommendation.places : activePlaces;
+  const shouldFetchOsmPlaces = Boolean(cityForSearch && (query.trim() || category !== "all"));
+  const osmPlaces = shouldFetchOsmPlaces
+    ? await searchOsmPlaces({
+        category,
+        city: cityForSearch,
+        detectedCategory: recommendation.detectedCategory,
+        limit: 36,
+        query,
+      })
+    : [];
+  const staticBasePlaces = category === "all" ? recommendation.places : activePlaces;
+  const basePlaces = mergePlaces(staticBasePlaces, osmPlaces);
   const filtered = basePlaces.filter((place) => {
     const locationMatches =
       !cityForSearch ||

@@ -6,6 +6,7 @@ import { useEffect, useMemo, useState } from "react";
 import { MapContainer, Marker, Popup, TileLayer } from "react-leaflet";
 import { useMap } from "react-leaflet";
 import type { PlaceMapProps } from "@/components/PlaceMap";
+import { isExternalPlaceProfile, placeProfileHref } from "@/lib/placeLinks";
 
 const defaultCenter: [number, number] = [59.9139, 10.7522];
 type LocationState =
@@ -192,30 +193,37 @@ export default function LeafletMap({
             </Popup>
           </Marker>
         ) : null}
-        {places.map((place) => (
-          <Marker
-            key={place.id}
-            icon={markerIcon}
-            position={[place.latitude, place.longitude]}
-          >
-            <Popup>
-              <div className="min-w-44">
-                <p className="font-semibold">{place.name}</p>
-                <p className="text-sm capitalize">{place.category.replace("-", " ")}</p>
-                <p className="mt-1 text-sm text-slate-600">{place.city}</p>
-                {scoreByPlaceId[place.id] ? (
-                  <p className="mt-1 text-sm">Score {scoreByPlaceId[place.id]}</p>
-                ) : null}
-                <a
-                  href={`/place/${place.slug}`}
-                  className="mt-2 inline-block text-sm font-semibold text-teal-700"
-                >
-                  View profile
-                </a>
-              </div>
-            </Popup>
-          </Marker>
-        ))}
+        {places.map((place) => {
+          const profileHref = placeProfileHref(place);
+          const profileIsExternal = isExternalPlaceProfile(place);
+
+          return (
+            <Marker
+              key={place.id}
+              icon={markerIcon}
+              position={[place.latitude, place.longitude]}
+            >
+              <Popup>
+                <div className="min-w-44">
+                  <p className="font-semibold">{place.name}</p>
+                  <p className="text-sm capitalize">{place.category.replace("-", " ")}</p>
+                  <p className="mt-1 text-sm text-slate-600">{place.city}</p>
+                  {scoreByPlaceId[place.id] ? (
+                    <p className="mt-1 text-sm">Score {scoreByPlaceId[place.id]}</p>
+                  ) : null}
+                  <a
+                    href={profileHref}
+                    className="mt-2 inline-block text-sm font-semibold text-teal-700"
+                    target={profileIsExternal ? "_blank" : undefined}
+                    rel={profileIsExternal ? "noreferrer" : undefined}
+                  >
+                    {profileIsExternal ? "Open in OSM" : "View profile"}
+                  </a>
+                </div>
+              </Popup>
+            </Marker>
+          );
+        })}
       </MapContainer>
     </div>
   );

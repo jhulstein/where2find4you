@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import { SponsoredBadge } from "@/components/SponsoredBadge";
 import { TrackingLink } from "@/components/TrackingLink";
+import { isExternalPlaceProfile, placeProfileHref } from "@/lib/placeLinks";
 import type { Place, PlaceAnalytics } from "@/lib/types";
 
 type PlaceCardProps = {
@@ -19,6 +20,8 @@ type PlaceCardProps = {
 
 export function PlaceCard({ place, analytics, compact = false }: PlaceCardProps) {
   const mapUrl = `https://www.google.com/maps/search/?api=1&query=${place.latitude},${place.longitude}`;
+  const profileHref = placeProfileHref(place);
+  const profileIsExternal = isExternalPlaceProfile(place);
 
   return (
     <article className="flex h-full flex-col rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:border-teal-300 hover:shadow-md">
@@ -32,10 +35,12 @@ export function PlaceCard({ place, analytics, compact = false }: PlaceCardProps)
           </div>
           <h2 className="mt-3 text-lg font-semibold text-slate-950">
             <TrackingLink
-              href={`/place/${place.slug}`}
+              href={profileHref}
               placeId={place.id}
               clickType="profile"
               className="hover:text-teal-800"
+              target={profileIsExternal ? "_blank" : undefined}
+              rel={profileIsExternal ? "noreferrer" : undefined}
             >
               {place.name}
             </TrackingLink>
@@ -88,12 +93,14 @@ export function PlaceCard({ place, analytics, compact = false }: PlaceCardProps)
 
       <div className="mt-auto flex flex-col gap-2 pt-5 sm:flex-row">
         <TrackingLink
-          href={`/place/${place.slug}`}
+          href={profileHref}
           placeId={place.id}
           clickType="profile"
           className="inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-lg bg-teal-700 px-3 py-2 text-sm font-semibold text-white transition hover:bg-teal-800"
+          target={profileIsExternal ? "_blank" : undefined}
+          rel={profileIsExternal ? "noreferrer" : undefined}
         >
-          View profile
+          {profileIsExternal ? "Open in OSM" : "View profile"}
           <ArrowUpRight aria-hidden="true" size={16} />
         </TrackingLink>
         {place.websiteUrl ? (
