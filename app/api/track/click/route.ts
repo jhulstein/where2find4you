@@ -8,6 +8,7 @@ export async function POST(request: Request) {
     searchId?: string | null;
     sessionId?: string;
     clickType: ClickType;
+    resultPosition?: number;
   };
 
   return NextResponse.json({ record: await logClick(body) });

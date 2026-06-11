@@ -5,6 +5,7 @@ const adminLinks = [
   { href: "/admin/places", label: "Places" },
   { href: "/admin/import", label: "Import" },
   { href: "/admin/leads", label: "Leads" },
+  { href: "/admin/search-analytics", label: "Search" },
 ];
 
 export function AdminNav() {

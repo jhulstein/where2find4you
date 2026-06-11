@@ -8,6 +8,7 @@ type TrackingLinkProps = AnchorHTMLAttributes<HTMLAnchorElement> & {
   children: ReactNode;
   clickType: ClickType;
   placeId: string;
+  resultPosition?: number;
   searchId?: string | null;
 };
 
@@ -16,6 +17,7 @@ export function TrackingLink({
   clickType,
   onClick,
   placeId,
+  resultPosition,
   searchId,
   ...props
 }: TrackingLinkProps) {
@@ -23,7 +25,7 @@ export function TrackingLink({
     onClick?.(event);
 
     if (!event.defaultPrevented) {
-      trackPlaceClick({ placeId, clickType, searchId });
+      trackPlaceClick({ placeId, clickType, resultPosition, searchId });
     }
   }
 

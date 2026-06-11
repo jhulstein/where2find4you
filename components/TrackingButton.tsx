@@ -8,6 +8,7 @@ type TrackingButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
   children: ReactNode;
   clickType: ClickType;
   placeId: string;
+  resultPosition?: number;
   searchId?: string | null;
 };
 
@@ -16,6 +17,7 @@ export function TrackingButton({
   clickType,
   onClick,
   placeId,
+  resultPosition,
   searchId,
   type = "button",
   ...props
@@ -24,7 +26,7 @@ export function TrackingButton({
     onClick?.(event);
 
     if (!event.defaultPrevented) {
-      trackPlaceClick({ placeId, clickType, searchId });
+      trackPlaceClick({ placeId, clickType, resultPosition, searchId });
     }
   }
 

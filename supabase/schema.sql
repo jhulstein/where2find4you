@@ -31,8 +31,13 @@ create table if not exists public.places (
 create table if not exists public.searches (
   id text primary key,
   query text not null,
+  normalized_query text not null default '',
   detected_category text,
   detected_location text,
+  result_count integer not null default 0,
+  filters_used jsonb not null default '{}'::jsonb,
+  user_location_available boolean not null default false,
+  latency_ms integer,
   user_city text,
   user_country text,
   session_id text not null,
@@ -57,6 +62,7 @@ create table if not exists public.place_clicks (
   click_type text not null check (
     click_type in ('profile', 'website', 'map', 'phone', 'booking', 'claim', 'promote')
   ),
+  result_position integer,
   created_at timestamptz not null default now()
 );
 
@@ -98,6 +104,9 @@ create index if not exists places_city_country_idx on public.places (city, count
 create index if not exists places_sponsored_idx on public.places (is_sponsored, sponsored_priority desc);
 create index if not exists places_tags_idx on public.places using gin (tags);
 create index if not exists searches_query_idx on public.searches using gin (to_tsvector('english', query));
+create index if not exists searches_normalized_query_idx on public.searches (normalized_query);
+create index if not exists searches_created_at_idx on public.searches (created_at desc);
+create index if not exists searches_filters_used_idx on public.searches using gin (filters_used);
 create index if not exists place_impressions_place_id_idx on public.place_impressions (place_id);
 create index if not exists place_impressions_search_id_idx on public.place_impressions (search_id);
 create index if not exists place_clicks_place_id_idx on public.place_clicks (place_id);

@@ -55,6 +55,7 @@ export function sendTrackingEvent(path: string, payload: Record<string, unknown>
 export function trackPlaceClick(input: {
   placeId: string;
   clickType: ClickType;
+  resultPosition?: number;
   searchId?: string | null;
 }) {
   sendTrackingEvent("/api/track/click", input);

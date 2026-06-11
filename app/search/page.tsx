@@ -9,7 +9,9 @@ import { getPlaceAnalytics } from "@/lib/analytics";
 import { cities, getCityBySearchTerm, normalizeLocation } from "@/lib/data/cities";
 import { activePlaces } from "@/lib/data/places";
 import { recommendPlaces } from "@/lib/ai/recommendPlaces";
+import { compareRankedPlaces, normalizeQuery, rankPlaces } from "@/lib/search/ranking";
 import { searchOsmPlaces } from "@/lib/search/osmPlaces";
+import { searchSupabasePlaces } from "@/lib/supabase/search";
 import {
   matchesSearchFilter,
   normalizeSearchFilter,
@@ -53,7 +55,7 @@ function mergePlaces(...placeGroups: Place[][]) {
 
 export default async function SearchPage({ searchParams }: SearchPageProps) {
   const params = await searchParams;
-  const query = params.q ?? "";
+  const query = normalizeQuery(params.q ?? "");
   const category = normalizeSearchFilter(params.category);
   const sort = params.sort ?? "relevance";
   const recommendation = query ? recommendPlaces(query) : { ...recommendPlaces(""), places: activePlaces };
@@ -64,7 +66,14 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
   const defaultFilterCity = category !== "all" ? cities[0] : null;
   const cityForSearch =
     selectedCity ?? getCityBySearchTerm(recommendation.detectedLocation) ?? defaultFilterCity;
-  const shouldFetchOsmPlaces = Boolean(cityForSearch && (query.trim() || category !== "all"));
+  const databaseSearch = await searchSupabasePlaces({
+    category,
+    limit: 80,
+    location: cityForSearch,
+    query,
+  });
+  const usesDatabase = databaseSearch !== null;
+  const shouldFetchOsmPlaces = !usesDatabase && Boolean(cityForSearch && (query || category !== "all"));
   const osmPlaces = shouldFetchOsmPlaces
     ? await searchOsmPlaces({
         category,
@@ -74,7 +83,7 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
         query,
       })
     : [];
-  const staticBasePlaces = category === "all" ? recommendation.places : activePlaces;
+  const staticBasePlaces = usesDatabase ? databaseSearch.places : activePlaces;
   const basePlaces = mergePlaces(staticBasePlaces, osmPlaces);
   const filtered = basePlaces.filter((place) => {
     const locationMatches =
@@ -82,32 +91,52 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
       normalizeLocation(place.city) === normalizeLocation(cityForSearch.name);
     return matchesSearchFilter(place, category) && locationMatches;
   });
-  const relevanceRank = new Map(
-    recommendation.places.map((place, index) => [place.id, index]),
-  );
-  const sorted = [...filtered].sort((a, b) => {
+  const ranked = rankPlaces(filtered, {
+    category,
+    getPopularityScore: (place) => getPlaceAnalytics(place).impressions,
+    location: cityForSearch,
+    query,
+  }).filter((item) => item.isRelevant || !query);
+  const sortedRanks = [...ranked].sort((a, b) => {
+    if (!query && category === "all" && !cityForSearch) {
+      return b.place.sponsoredPriority - a.place.sponsoredPriority;
+    }
+
     if (sort === "popularity") {
-      return getPlaceAnalytics(b).impressions - getPlaceAnalytics(a).impressions;
+      if (query) {
+        return compareRankedPlaces(a, b);
+      }
+
+      return (
+        getPlaceAnalytics(b.place).impressions - getPlaceAnalytics(a.place).impressions ||
+        compareRankedPlaces(a, b)
+      );
     }
     if (sort === "newest") {
-      return Date.parse(b.createdAt) - Date.parse(a.createdAt);
-    }
-
-    if (query) {
-      const aRank = relevanceRank.get(a.id) ?? Number.MAX_SAFE_INTEGER;
-      const bRank = relevanceRank.get(b.id) ?? Number.MAX_SAFE_INTEGER;
-
-      if (aRank !== bRank) {
-        return aRank - bRank;
+      if (query) {
+        return compareRankedPlaces(a, b);
       }
+
+      return Date.parse(b.place.createdAt) - Date.parse(a.place.createdAt) || compareRankedPlaces(a, b);
     }
 
-    return b.sponsoredPriority - a.sponsoredPriority;
+    return compareRankedPlaces(a, b);
   });
+  const sorted = sortedRanks.map((item) => item.place);
   const searchRecord = await createSearchRecord({
-    query: query || "all places",
+    query: params.q?.trim() || "all places",
+    normalizedQuery: query,
     detectedCategory: recommendation.detectedCategory,
     detectedLocation: recommendation.detectedLocation,
+    resultCount: sorted.length,
+    filtersUsed: {
+      category,
+      location: cityForSearch?.slug ?? params.location ?? null,
+      sort,
+      source: usesDatabase ? "supabase" : shouldFetchOsmPlaces ? "openstreetmap-fallback" : "static",
+    },
+    userLocationAvailable: false,
+    latencyMs: null,
   });
   await logImpressions({
     places: sorted.map((place) => ({ id: place.id, isSponsored: place.isSponsored })),
@@ -131,6 +160,7 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
       <ResponsiveContainer className="py-6 sm:py-8">
         <div className="mb-6 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
           <SearchBar
+            category={category}
             defaultValue={query}
             compact
             location={cityForSearch?.slug ?? params.location}
@@ -237,8 +267,14 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
         </div>
 
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
-          {sorted.map((place) => (
-            <PlaceCard key={place.id} place={place} analytics={getPlaceAnalytics(place)} />
+          {sorted.map((place, index) => (
+            <PlaceCard
+              key={place.id}
+              place={place}
+              analytics={getPlaceAnalytics(place)}
+              resultPosition={index + 1}
+              searchId={searchRecord.id}
+            />
           ))}
         </div>
         {sorted.length === 0 ? (

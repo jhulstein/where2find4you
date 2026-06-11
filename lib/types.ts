@@ -11,6 +11,14 @@ export type PlaceCategory =
   | "parks"
   | "local-services";
 
+export type JsonValue =
+  | string
+  | number
+  | boolean
+  | null
+  | JsonValue[]
+  | { [key: string]: JsonValue };
+
 export type City = {
   id: string;
   name: string;
@@ -51,8 +59,13 @@ export type Place = {
 export type SearchRecord = {
   id: string;
   query: string;
+  normalizedQuery: string;
   detectedCategory: PlaceCategory | null;
   detectedLocation: string | null;
+  resultCount: number;
+  filtersUsed: Record<string, JsonValue>;
+  userLocationAvailable: boolean;
+  latencyMs: number | null;
   userCity: string | null;
   userCountry: string | null;
   sessionId: string;
@@ -84,6 +97,7 @@ export type PlaceClick = {
   searchId: string | null;
   sessionId: string;
   clickType: ClickType;
+  resultPosition: number | null;
   createdAt: string;
 };
 

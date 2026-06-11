@@ -15,10 +15,18 @@ type PlaceCardProps = {
   place: Place;
   analytics?: PlaceAnalytics;
   compact?: boolean;
+  resultPosition?: number;
   score?: unknown;
+  searchId?: string | null;
 };
 
-export function PlaceCard({ place, analytics, compact = false }: PlaceCardProps) {
+export function PlaceCard({
+  place,
+  analytics,
+  compact = false,
+  resultPosition,
+  searchId,
+}: PlaceCardProps) {
   const mapUrl = `https://www.google.com/maps/search/?api=1&query=${place.latitude},${place.longitude}`;
   const profileHref = placeProfileHref(place);
   const profileIsExternal = isExternalPlaceProfile(place);
@@ -38,6 +46,8 @@ export function PlaceCard({ place, analytics, compact = false }: PlaceCardProps)
               href={profileHref}
               placeId={place.id}
               clickType="profile"
+              resultPosition={resultPosition}
+              searchId={searchId}
               className="hover:text-teal-800"
               target={profileIsExternal ? "_blank" : undefined}
               rel={profileIsExternal ? "noreferrer" : undefined}
@@ -96,6 +106,8 @@ export function PlaceCard({ place, analytics, compact = false }: PlaceCardProps)
           href={profileHref}
           placeId={place.id}
           clickType="profile"
+          resultPosition={resultPosition}
+          searchId={searchId}
           className="inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-lg bg-teal-700 px-3 py-2 text-sm font-semibold text-white transition hover:bg-teal-800"
           target={profileIsExternal ? "_blank" : undefined}
           rel={profileIsExternal ? "noreferrer" : undefined}
@@ -108,6 +120,8 @@ export function PlaceCard({ place, analytics, compact = false }: PlaceCardProps)
             href={place.websiteUrl}
             placeId={place.id}
             clickType="website"
+            resultPosition={resultPosition}
+            searchId={searchId}
             className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
           >
             <Globe2 aria-hidden="true" size={16} />
@@ -119,6 +133,8 @@ export function PlaceCard({ place, analytics, compact = false }: PlaceCardProps)
             href={`tel:${place.phone}`}
             placeId={place.id}
             clickType="phone"
+            resultPosition={resultPosition}
+            searchId={searchId}
             className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
             aria-label={`Call ${place.name}`}
           >
@@ -129,6 +145,8 @@ export function PlaceCard({ place, analytics, compact = false }: PlaceCardProps)
           href={mapUrl}
           placeId={place.id}
           clickType="map"
+          resultPosition={resultPosition}
+          searchId={searchId}
           className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
           target="_blank"
           rel="noreferrer"

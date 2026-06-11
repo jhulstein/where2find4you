@@ -10,12 +10,29 @@ import type {
 
 const createdAt = "2026-06-08T10:00:00.000Z";
 
+function seedResultCount(category: SearchRecord["detectedCategory"]) {
+  return activePlaces.filter((place) => !category || place.category === category).length;
+}
+
+function seedFilters(category: SearchRecord["detectedCategory"], location: string | null) {
+  return {
+    category: category ?? "all",
+    location,
+    source: "seed",
+  } satisfies SearchRecord["filtersUsed"];
+}
+
 export const searches: SearchRecord[] = [
   {
     id: "search-001",
     query: "romantic restaurant near the waterfront",
+    normalizedQuery: "romantic restaurant near the waterfront",
     detectedCategory: "restaurants",
     detectedLocation: "oslo",
+    resultCount: seedResultCount("restaurants"),
+    filtersUsed: seedFilters("restaurants", "oslo"),
+    userLocationAvailable: false,
+    latencyMs: null,
     userCity: null,
     userCountry: null,
     sessionId: "seed-session-1",
@@ -24,8 +41,13 @@ export const searches: SearchRecord[] = [
   {
     id: "search-002",
     query: "quiet cafe with wifi",
+    normalizedQuery: "quiet cafe with wifi",
     detectedCategory: "cafes",
     detectedLocation: "oslo",
+    resultCount: seedResultCount("cafes"),
+    filtersUsed: seedFilters("cafes", "oslo"),
+    userLocationAvailable: false,
+    latencyMs: null,
     userCity: null,
     userCountry: null,
     sessionId: "seed-session-2",
@@ -34,8 +56,13 @@ export const searches: SearchRecord[] = [
   {
     id: "search-003",
     query: "marina with nearby restaurants",
+    normalizedQuery: "marina with nearby restaurants",
     detectedCategory: "marinas",
     detectedLocation: "miami",
+    resultCount: seedResultCount("marinas"),
+    filtersUsed: seedFilters("marinas", "miami"),
+    userLocationAvailable: false,
+    latencyMs: null,
     userCity: null,
     userCountry: null,
     sessionId: "seed-session-3",
@@ -44,8 +71,13 @@ export const searches: SearchRecord[] = [
   {
     id: "search-004",
     query: "family activities in Oslo",
+    normalizedQuery: "family activities in oslo",
     detectedCategory: "activities",
     detectedLocation: "oslo",
+    resultCount: seedResultCount("activities"),
+    filtersUsed: seedFilters("activities", "oslo"),
+    userLocationAvailable: false,
+    latencyMs: null,
     userCity: null,
     userCountry: null,
     sessionId: "seed-session-4",
@@ -72,6 +104,7 @@ export const placeClicks: PlaceClick[] = activePlaces.flatMap((place, index) =>
     searchId: searches[itemIndex % searches.length]?.id ?? null,
     sessionId: `seed-session-${itemIndex % 6}`,
     clickType: itemIndex % 2 === 0 ? "profile" : "website",
+    resultPosition: (itemIndex % 10) + 1,
     createdAt,
   })),
 );
@@ -92,15 +125,25 @@ function id(prefix: string) {
 
 export async function createSearchRecord(input: {
   query: string;
+  normalizedQuery: string;
   detectedCategory: SearchRecord["detectedCategory"];
   detectedLocation: string | null;
+  resultCount: number;
+  filtersUsed?: SearchRecord["filtersUsed"];
+  userLocationAvailable?: boolean;
+  latencyMs?: number | null;
   sessionId?: string;
 }) {
   const record: SearchRecord = {
     id: id("search"),
     query: input.query,
+    normalizedQuery: input.normalizedQuery,
     detectedCategory: input.detectedCategory,
     detectedLocation: input.detectedLocation,
+    resultCount: input.resultCount,
+    filtersUsed: input.filtersUsed ?? {},
+    userLocationAvailable: input.userLocationAvailable ?? false,
+    latencyMs: input.latencyMs ?? null,
     userCity: null,
     userCountry: null,
     sessionId: input.sessionId ?? "anonymous-session",
@@ -135,6 +178,7 @@ export async function logClick(input: {
   searchId?: string | null;
   sessionId?: string;
   clickType: ClickType;
+  resultPosition?: number | null;
 }) {
   const record: PlaceClick = {
     id: id("click"),
@@ -142,6 +186,7 @@ export async function logClick(input: {
     searchId: input.searchId ?? null,
     sessionId: input.sessionId ?? "anonymous-session",
     clickType: input.clickType,
+    resultPosition: input.resultPosition ?? null,
     createdAt: new Date().toISOString(),
   };
   placeClicks.unshift(record);
@@ -171,8 +216,13 @@ async function persistSearch(record: SearchRecord) {
     {
       id: record.id,
       query: record.query,
+      normalized_query: record.normalizedQuery,
       detected_category: record.detectedCategory,
       detected_location: record.detectedLocation,
+      result_count: record.resultCount,
+      filters_used: record.filtersUsed,
+      user_location_available: record.userLocationAvailable,
+      latency_ms: record.latencyMs,
       user_city: record.userCity,
       user_country: record.userCountry,
       session_id: record.sessionId,
@@ -204,6 +254,7 @@ async function persistClick(record: PlaceClick) {
       search_id: record.searchId,
       session_id: record.sessionId,
       click_type: record.clickType,
+      result_position: record.resultPosition,
       created_at: record.createdAt,
     },
   ]);

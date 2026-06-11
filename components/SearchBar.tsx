@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowRight, Search } from "lucide-react";
 import { exampleSearches } from "@/lib/data/exampleSearches";
+import { normalizeQuery } from "@/lib/search/ranking";
 
 type SearchBarProps = {
   category?: string;
@@ -25,7 +26,7 @@ export function SearchBar({
   const [query, setQuery] = useState(defaultValue);
 
   function searchPath(searchQuery: string) {
-    const trimmed = searchQuery.trim();
+    const trimmed = normalizeQuery(searchQuery);
     const searchParams = new URLSearchParams();
 
     if (trimmed) {
