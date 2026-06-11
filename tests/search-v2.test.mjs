@@ -73,6 +73,11 @@ const wifiIds = [
   "fjord-visitor-center",
 ];
 
+const restaurantIds = [
+  "waterfront-table",
+  "fjord-dinner-house",
+];
+
 const places = [
   place({
     id: "quiet-corner-cafe",
@@ -202,6 +207,15 @@ const places = [
     tags: ["restaurant", "seafood", "dinner"],
   }),
   place({
+    id: "fjord-dinner-house",
+    name: "Fjord Dinner House",
+    category: "restaurants",
+    description: "Norwegian spisested with dinner, local mat and harbor views.",
+    latitude: 59.91,
+    longitude: 10.731,
+    tags: ["restaurant", "middag", "mat", "spisested"],
+  }),
+  place({
     id: "rooftop-north",
     name: "Rooftop North",
     category: "bars",
@@ -281,6 +295,28 @@ test("free WiFi and WiFi variants return structured WiFi places", () => {
       assert.equal(ids.includes(id), true, `${query} should include ${id}`);
     }
     assert.equal(ids.includes("waterfront-table"), false, `${query} should not include non-WiFi restaurant`);
+  }
+});
+
+test("restaurant intent variants include English, Norwegian and Swedish terms", () => {
+  const queries = [
+    "restaurant",
+    "restaurants",
+    "resturant",
+    "resturants",
+    "restauranter",
+    "restauranger",
+    "restaurang",
+    "spisested",
+    "middag",
+    "mat",
+  ];
+
+  for (const query of queries) {
+    const ids = idsFor(query);
+    for (const id of restaurantIds) {
+      assert.equal(ids.includes(id), true, `${query} should include ${id}`);
+    }
   }
 });
 

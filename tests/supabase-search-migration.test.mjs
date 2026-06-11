@@ -21,6 +21,7 @@ test("normalizes accents, possessives, plurals and WiFi variants in SQL", () => 
   assert.match(sql, /\(\[\[:alnum:\]\]\+\)''s/i);
   assert.match(sql, /wi\[\[:space:\]-\]\*fi\+/i);
   assert.match(sql, /\\mcafes\\M/i);
+  assert.match(sql, /restauranter\|restauranger\|restaurang/i);
 });
 
 test("adds trigram and geography indexes for place search", () => {

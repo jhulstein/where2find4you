@@ -76,9 +76,31 @@ Search migration:
 
 Defined in `searchIntents` in `lib/search/ranking.js`.
 
+Restaurant intent:
+
+- `restaurant`
+- `restaurants`
+- `resturant`
+- `resturants`
+- `restauranter`
+- `restauranger`
+- `restaurang`
+- `spisested`
+- `spisesteder`
+- `dinner`
+- `food`
+- `meal`
+- `seafood`
+- `middag`
+- `mat`
+
 Cafe intent:
 
 - `cafe`
+- `restaurant`
+- `restaurants`
+- `restauranter`
+- `restauranger`
 - `cafes`
 - `café`
 - `cafés`

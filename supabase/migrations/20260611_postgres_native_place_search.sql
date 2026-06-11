@@ -35,8 +35,12 @@ as $$
           ' ',
           'g'
         ),
-        '\mcafes\M',
-        'cafe',
+          '\mcafes\M',
+          'cafe',
+          'g'
+        ),
+        '\m(restaurants|restauranter|restauranger|restaurang|resturants|resturant)\M',
+        'restaurant',
         'g'
       ),
       '[[:space:]]+',
