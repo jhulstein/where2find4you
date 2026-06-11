@@ -9,7 +9,11 @@ import { getPlaceAnalytics } from "@/lib/analytics";
 import { cities, getCityBySearchTerm, normalizeLocation } from "@/lib/data/cities";
 import { activePlaces } from "@/lib/data/places";
 import { recommendPlaces } from "@/lib/ai/recommendPlaces";
-import { matchesSearchFilter, normalizeSearchFilter } from "@/lib/searchFilters";
+import {
+  matchesSearchFilter,
+  normalizeSearchFilter,
+  searchFilterOptions,
+} from "@/lib/searchFilters";
 import { createSearchRecord, logImpressions } from "@/lib/tracking";
 
 type SearchPageProps = {
@@ -31,8 +35,9 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
     getCityBySearchTerm(params.location) ??
     getCityBySearchTerm(query) ??
     getCityBySearchTerm(recommendation.detectedLocation);
+  const defaultFilterCity = category !== "all" ? cities[0] : null;
   const cityForSearch =
-    selectedCity ?? getCityBySearchTerm(recommendation.detectedLocation);
+    selectedCity ?? getCityBySearchTerm(recommendation.detectedLocation) ?? defaultFilterCity;
   const basePlaces = category === "all" ? recommendation.places : activePlaces;
   const filtered = basePlaces.filter((place) => {
     const locationMatches =
@@ -41,6 +46,9 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
       normalizeLocation(place.country) === normalizeLocation(cityForSearch.country);
     return matchesSearchFilter(place, category) && locationMatches;
   });
+  const relevanceRank = new Map(
+    recommendation.places.map((place, index) => [place.id, index]),
+  );
   const sorted = [...filtered].sort((a, b) => {
     if (sort === "popularity") {
       return getPlaceAnalytics(b).impressions - getPlaceAnalytics(a).impressions;
@@ -48,6 +56,16 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
     if (sort === "newest") {
       return Date.parse(b.createdAt) - Date.parse(a.createdAt);
     }
+
+    if (query) {
+      const aRank = relevanceRank.get(a.id) ?? Number.MAX_SAFE_INTEGER;
+      const bRank = relevanceRank.get(b.id) ?? Number.MAX_SAFE_INTEGER;
+
+      if (aRank !== bRank) {
+        return aRank - bRank;
+      }
+    }
+
     return b.sponsoredPriority - a.sponsoredPriority;
   });
   const searchRecord = await createSearchRecord({
@@ -63,6 +81,12 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
   const cityLabel = cityForSearch
     ? `${cityForSearch.name}, ${cityForSearch.country}`
     : "All pilot cities";
+  const activeFilter = searchFilterOptions.find((option) => option.id === category);
+  const pageTitle = query
+    ? `Results for “${query}”`
+    : category === "all"
+      ? "Explore places"
+      : `${activeFilter?.label ?? "Places"} in ${cityForSearch?.name ?? "pilot cities"}`;
   const donationUrl = process.env.NEXT_PUBLIC_DONATION_URL ?? "/contact?reason=donation";
   const donationIsExternal = donationUrl.startsWith("http");
 
@@ -71,7 +95,6 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
       <ResponsiveContainer className="py-6 sm:py-8">
         <div className="mb-6 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
           <SearchBar
-            category={category}
             defaultValue={query}
             compact
             location={cityForSearch?.slug ?? params.location}
@@ -136,7 +159,7 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
         <div className="mb-5 grid gap-4 lg:grid-cols-[minmax(0,1fr)_310px] lg:items-end">
           <div>
             <h1 className="text-2xl font-semibold text-slate-950 sm:text-3xl">
-              {query ? `Results for “${query}”` : "Explore places"}
+              {pageTitle}
             </h1>
             <p className="mt-1 text-sm text-slate-600">
               City: <span className="font-semibold text-slate-800">{cityLabel}</span>.

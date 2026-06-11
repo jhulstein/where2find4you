@@ -16,12 +16,13 @@ export function CategoryFilter({
 }: CategoryFilterProps) {
   function hrefFor(categoryId: SearchFilterId) {
     const searchParams = new URLSearchParams();
+    const nextLocation = location ?? (categoryId === "all" ? undefined : "oslo");
 
     if (query) {
       searchParams.set("q", query);
     }
-    if (location) {
-      searchParams.set("location", location);
+    if (nextLocation) {
+      searchParams.set("location", nextLocation);
     }
     searchParams.set("category", categoryId);
     searchParams.set("sort", sort);
