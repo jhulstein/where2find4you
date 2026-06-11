@@ -17,6 +17,7 @@
     "lint": "eslint . --ignore-pattern dist --ignore-pattern .next",
     "db:generate": "drizzle-kit generate",
     "seed:places": "node scripts/seed-places.mjs",
+    "search:reindex": "node scripts/reindex-typesense.mjs",
     "import:osm": "node scripts/import-osm.mjs"
   },
   "dependencies": {

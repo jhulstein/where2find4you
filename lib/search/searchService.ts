@@ -8,6 +8,10 @@ import {
   searchPlaceRecords,
 } from "@/lib/search/ranking";
 import {
+  searchTypesensePlaces,
+  type TypesenseSearchDebugHit,
+} from "@/lib/search/typesenseClient";
+import {
   normalizeSearchFilter,
   type SearchFilterId,
 } from "@/lib/searchFilters";
@@ -23,6 +27,7 @@ export type SearchCoordinates = {
 
 export type SearchServiceInput = {
   category?: string | null;
+  debug?: boolean;
   includeOsmFallback?: boolean;
   limit?: number;
   location?: string | null;
@@ -46,10 +51,19 @@ export type SearchServiceResult = {
   pageSize: number;
   query: string;
   results: Place[];
-  source: "supabase" | "supabase+openstreetmap" | "static" | "static+openstreetmap";
+  source:
+    | "typesense"
+    | "supabase"
+    | "supabase+openstreetmap"
+    | "static"
+    | "static+openstreetmap";
   sort: SearchSort;
   totalCount: number;
   userLocationAvailable: boolean;
+  debug?: {
+    hits: TypesenseSearchDebugHit[];
+    parameters: Record<string, string>;
+  };
 };
 
 function placeMergeKey(place: Place) {
@@ -114,16 +128,25 @@ function findSearchCity(input: SearchServiceInput, normalizedQuery: string, cate
   return category !== "all" ? cities[0] : null;
 }
 
-export async function searchPlaces(input: SearchServiceInput = {}): Promise<SearchServiceResult> {
-  const rawQuery = input.query?.trim() ?? "";
-  const normalizedQuery = normalizeQuery(rawQuery);
+async function searchFallbackPlaces(input: SearchServiceInput & {
+  category: SearchFilterId;
+  city: City | null;
+  normalizedQuery: string;
+  offset: number;
+  page: number;
+  pageSize: number;
+  sort: SearchSort;
+}): Promise<SearchServiceResult> {
+  const {
+    category,
+    city,
+    normalizedQuery,
+    offset,
+    page,
+    pageSize,
+    sort,
+  } = input;
   const intent = detectSearchIntent(normalizedQuery);
-  const category = normalizeSearchFilter(input.category ?? undefined);
-  const sort = normalizeSort(input.sort);
-  const city = findSearchCity(input, normalizedQuery, category);
-  const pageSize = pageSizeFor(input);
-  const offset = offsetFor(input, pageSize);
-  const page = Math.floor(offset / pageSize) + 1;
   const candidateLimit = Math.max(80, Math.min(pageSize + offset + 80, 180));
   const databaseRequests = [
     searchSupabasePlaces({
@@ -223,11 +246,75 @@ export async function searchPlaces(input: SearchServiceInput = {}): Promise<Sear
     offset,
     page,
     pageSize,
-    query: rawQuery,
+    query: input.query?.trim() ?? "",
     results: search.results,
     source,
     sort,
     totalCount: search.totalCount,
     userLocationAvailable: Boolean(input.userLocation),
   };
+}
+
+export async function searchPlaces(input: SearchServiceInput = {}): Promise<SearchServiceResult> {
+  const rawQuery = input.query?.trim() ?? "";
+  const normalizedQuery = normalizeQuery(rawQuery);
+  const intent = detectSearchIntent(normalizedQuery);
+  const category = normalizeSearchFilter(input.category ?? undefined);
+  const sort = normalizeSort(input.sort);
+  const city = findSearchCity(input, normalizedQuery, category);
+  const pageSize = pageSizeFor(input);
+  const offset = offsetFor(input, pageSize);
+  const page = Math.floor(offset / pageSize) + 1;
+  const typesenseSearch = await searchTypesensePlaces({
+    category,
+    debug: input.debug,
+    limit: pageSize,
+    location: city,
+    offset,
+    page,
+    pageSize,
+    query: normalizedQuery,
+    sort,
+    userLocation: input.userLocation,
+  });
+
+  if (typesenseSearch) {
+    return {
+      category,
+      city,
+      debug: typesenseSearch.debug,
+      detectedCategory: intent.detectedCategory,
+      detectedLocation: city?.slug ?? null,
+      filtersUsed: {
+        category,
+        location: city?.slug ?? input.location ?? null,
+        offset,
+        page,
+        pageSize,
+        sort,
+        source: "typesense",
+      },
+      normalizedQuery,
+      offset,
+      page,
+      pageSize,
+      query: rawQuery,
+      results: typesenseSearch.places,
+      source: "typesense",
+      sort,
+      totalCount: typesenseSearch.totalCount,
+      userLocationAvailable: Boolean(input.userLocation),
+    };
+  }
+
+  return searchFallbackPlaces({
+    ...input,
+    category,
+    city,
+    normalizedQuery,
+    offset,
+    page,
+    pageSize,
+    sort,
+  });
 }

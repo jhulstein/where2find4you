@@ -2,16 +2,24 @@
 
 Search is centralized in `lib/search/searchService.ts`.
 
+The production search architecture is now:
+
+1. The application database/Supabase remains the source of truth.
+2. Typesense is the primary search index.
+3. `searchPlaces(...)` normalizes the query, detects intent, builds Typesense parameters, calls Typesense, and returns results.
+4. If Typesense is not configured or unavailable, `searchPlaces(...)` falls back to the existing Supabase/static/OpenStreetMap path.
+5. Search analytics still run through `lib/tracking.ts`.
+
+Do not add one-off search logic to UI components, API routes, or page code.
+
 ## Current Flow
 
 1. The UI submits `/search` through `components/SearchBar.tsx`.
 2. `app/search/page.tsx` calls `searchPlaces(...)`.
 3. `app/api/search/route.ts` also calls `searchPlaces(...)`.
-4. `searchPlaces(...)` normalizes the query, detects intent, gathers candidates from Supabase or static seed data, optionally supplements sparse local results with OpenStreetMap, and calls the shared ranking core.
-5. `lib/search/ranking.js` owns query normalization, intent/synonym expansion, filtering, ranking, and pagination through `searchPlaceRecords(...)`.
-6. Search records, impressions, and clicks are tracked in `lib/tracking.ts`.
-
-Legacy `lib/ai/recommendPlaces.ts` now uses the Search v2 intent detector instead of keeping its own category keyword map.
+4. `searchPlaces(...)` tries `searchTypesensePlaces(...)` first.
+5. Typesense uses the collection schema, query builder, document mapper, and synonyms in `lib/search/typesenseCore.js`.
+6. If Typesense fails or is not configured, the fallback path uses Supabase RPC/static seed data/OpenStreetMap and the local ranker in `lib/search/ranking.js`.
 
 ## Searchable Data
 
@@ -35,28 +43,59 @@ Places currently support:
 - optional `hasWifi`
 - optional `freeWifi`
 
-The Supabase `places` table currently stores name, category, tags, descriptions, address, latitude/longitude, rating, opening hours, sponsorship, active status, and timestamps. Optional structured fields such as `amenities`, `features`, `hasWifi`, `freeWifi`, and `isVerified` are supported in the application ranker and can be added to the database later.
+The Supabase `places` table stores name, category, tags, descriptions, address, latitude/longitude, rating, opening hours, sponsorship, active status, and timestamps. Optional structured fields such as `amenities`, `features`, `hasWifi`, `freeWifi`, and `isVerified` are supported in the Typesense document mapper and can be added to the database later.
 
-## Database Indexes
+## Typesense Document
 
-Base schema indexes:
+`createTypesensePlaceDocument(...)` indexes:
 
-- `places_slug_idx`
-- `places_category_idx`
-- `places_city_country_idx`
-- `places_sponsored_idx`
-- `places_tags_idx`
-- tracking indexes on searches, impressions, clicks, and views
+- `id`
+- `recordId`
+- `name`
+- `normalizedName`
+- `description`
+- `shortDescription`
+- `category`
+- `normalizedCategory`
+- `categoryAliases`
+- `tags`
+- `normalizedTags`
+- `amenities`
+- `normalizedAmenities`
+- `features`
+- `normalizedFeatures`
+- `searchText`
+- `address`
+- `city`
+- `country`
+- `location`
+- `hasWifi`
+- `freeWifi`
+- `publicWifi`
+- `rating`
+- `popularity`
+- `verified`
+- `openNow`
+- `isSponsored`
+- `sponsoredPriority`
+- `isActive`
+- `updatedAt`
 
-Search migration:
+Category, tags, amenities, city, country, WiFi booleans, verified/open state, source and active status are configured as filter/facet fields where useful. Rating, popularity, sponsorship priority and updated time are sortable tie-break fields.
 
-- enables `pg_trgm`
-- enables `postgis`
-- enables `unaccent`
-- adds generated `geog geography(Point, 4326)`
-- adds trigram indexes for name, category, tags, description, and combined search text
-- adds GiST geography index
-- adds `search_places(...)` RPC with limit/offset pagination
+## Typesense Querying
+
+The backend uses:
+
+- `query_by` across normalized/raw name, category, category aliases, tags, amenities, features, search text, description and address.
+- `query_by_weights` so name/category/tags/amenities outrank description.
+- `num_typos=2` for typo tolerance.
+- `prefix=true` for partial/prefix matching.
+- `prioritize_exact_match=true`.
+- `filter_by` for active records, category filters, city/location, WiFi filters and rooftop filters.
+- `sort_by` beginning with `_text_match:desc`, then optional geo distance and only then verified/rating/popularity/freshness.
+
+Core rule: relevance comes first. Distance, popularity, rating, verified status, freshness and opening status must not overpower text/category/amenity relevance.
 
 ## Normalization
 
@@ -74,7 +113,8 @@ Search migration:
 
 ## Intents And Synonyms
 
-Defined in `searchIntents` in `lib/search/ranking.js`.
+Intent detection lives in `lib/search/ranking.js`.
+Typesense synonyms are built from those intents in `typesenseSynonyms`.
 
 Restaurant intent:
 
@@ -97,10 +137,6 @@ Restaurant intent:
 Cafe intent:
 
 - `cafe`
-- `restaurant`
-- `restaurants`
-- `restauranter`
-- `restauranger`
 - `cafes`
 - `café`
 - `cafés`
@@ -134,56 +170,104 @@ Free WiFi intent:
 - `no-cost internet`
 - `included wifi`
 
-## Ranking
+## Sync And Backfill
 
-Ranking is tier-first. The current model is:
+Full reindex:
 
-1. Exact normalized name match: `+120`
-2. Exact structured category/type match: `+110`
-3. Exact structured amenity match: `+100`
-4. Structured `freeWifi`/free-WiFi match: `+100`
-5. Tag match: `+85`
-6. Name prefix match: `+80`
-7. Category or amenity synonym match: `+70`
-8. Fuzzy name/category/tag match: `+55`
-9. Description match: `+30`
-10. Free/complimentary modifier: `+20`
-11. Nearby distance boost: `+0` to `+20`
-12. Verified/open/rating/popularity/sponsorship tie-breakers: `+0` to `+10`
+```bash
+npm run search:reindex
+```
 
-Location boosts only apply after relevance tiers, so nearby irrelevant places should not outrank relevant text or structured matches.
+The script:
 
-## Filters And Pagination
+1. Reads active places from Supabase when `NEXT_PUBLIC_SUPABASE_URL` and a Supabase secret/service key are configured.
+2. Falls back to seed data for local development.
+3. Ensures the Typesense collection exists.
+4. Upserts Typesense synonyms.
+5. Imports active places using `action=upsert`.
 
-Filters are normalized through `normalizeSearchFilter(...)` and applied by the shared core:
+Dry run:
 
-- `all`
-- `free-wifi`
-- `rooftops`
-- place categories such as `cafes`, `restaurants`, `hotels`
+```bash
+node scripts/reindex-typesense.mjs --dry-run
+```
 
-Pagination is handled by `searchPlaceRecords(...)` with `limit` and `offset`. The API also accepts `limit` and `offset`.
+Force seed data:
 
-## Why The Old Search Returned Too Few Results
+```bash
+node scripts/reindex-typesense.mjs --source=seed
+```
 
-- Query normalization did not fully handle possessives like `cafe’s`.
-- Cafe synonyms such as `coffee shop`, `coffeehouse`, `kafé`, `kaffebar`, and `kaffe` were not centralized.
-- WiFi variants such as `wireless internet`, `wlan`, and misspelled `wifii` were not treated as one intent.
-- Search logic was duplicated across the page, API route, recommendation helper, filter helper, and database helper.
-- Category filters could accidentally become ranking matches and make weak results appear relevant.
-- Supabase and local/static fallback behavior were decided in route code rather than a single backend service.
+Force Supabase:
 
-## Adding A New Intent
+```bash
+node scripts/reindex-typesense.mjs --source=supabase
+```
 
-1. Add the intent to `searchIntents` in `lib/search/ranking.js`.
-2. Add phrase variants and normalized terms.
-3. If it maps to a category, set `category`.
-4. If it needs special structured matching, extend `placeMatchesIntent(...)`.
-5. Add regression cases in `tests/search-v2.test.mjs`.
-6. If Supabase should support it natively, update `search_places(...)` and its migration tests.
+Incremental sync:
+
+- `syncTypesensePlace(place)` upserts active places.
+- `syncTypesensePlace(place)` removes inactive places.
+- `removeTypesensePlace(recordId)` deletes records.
+- `reindexTypesensePlaces(places)` backfills a batch.
+
+The current admin write route is still a placeholder. When real create/update/delete writes are added, call the sync functions after the database commit. If a future job queue is added, failed sync jobs should be retried there. Until then, indexing failures are logged and the fallback search path keeps the product usable.
+
+## Environment
+
+Server-side only:
+
+```env
+TYPESENSE_HOST=
+TYPESENSE_PORT=8108
+TYPESENSE_PROTOCOL=https
+TYPESENSE_API_KEY=
+TYPESENSE_SEARCH_ONLY_API_KEY=
+TYPESENSE_COLLECTION=places_v1
+```
+
+Do not expose `TYPESENSE_API_KEY` to the browser. The app currently searches server-side, so the frontend does not need a Typesense key.
+
+## Local Development
+
+Start Typesense locally:
+
+```bash
+docker compose -f docker-compose.typesense.yml up
+```
+
+Use:
+
+```env
+TYPESENSE_HOST=localhost
+TYPESENSE_PORT=8108
+TYPESENSE_PROTOCOL=http
+TYPESENSE_API_KEY=local-typesense-admin-key
+TYPESENSE_COLLECTION=places_v1
+```
+
+Then run:
+
+```bash
+npm run search:reindex
+```
+
+## Debugging Poor Results
+
+1. Call `/api/search?q=...&debug=1`.
+2. Check `debug.parameters` to confirm `query_by`, `filter_by`, `sort_by`, page and typo settings.
+3. Check `debug.hits` for Typesense text match order.
+4. Confirm the expected record exists in Typesense by reindexing.
+5. If the right record is missing from the source database, fix data enrichment first.
+6. If the record exists but fields are weak, improve category, tags, amenities, features or structured WiFi booleans.
+7. Add or update regression tests before changing weights, synonyms or normalization.
 
 ## Known Regression Queries
 
+- `restaurant`
+- `restaurants`
+- `restauranter`
+- `restauranger`
 - `cafe`
 - `cafes`
 - `café`
@@ -206,23 +290,25 @@ Pagination is handled by `searchPlaceRecords(...)` with `limit` and `offset`. Th
 
 ## Running Search Tests
 
-Run the focused search tests:
+Focused search tests:
 
 ```bash
-node --test tests/search-v2.test.mjs tests/search-ranking.test.mjs tests/search-relevance-suite.test.mjs tests/supabase-search-migration.test.mjs
+node --test tests/search-v2.test.mjs tests/search-ranking.test.mjs tests/search-relevance-suite.test.mjs tests/typesense-search.test.mjs
 ```
 
-Run all tests:
+All tests:
 
 ```bash
 node --test tests/*.test.mjs
 ```
 
-## Debugging Poor Results
+## Data Quality Notes
 
-1. Normalize the user query with `normalizeQuery(...)`.
-2. Check detected intent with `detectSearchIntent(...)`.
-3. Confirm enough candidates are loaded by `searchPlaces(...)`.
-4. Inspect the ranked output from `searchPlaceRecords(...)`.
-5. If the right records are missing entirely, fix data enrichment first: category, tags, amenities, or structured WiFi/free-WiFi fields.
-6. Add or update regression tests before changing weights or synonyms.
+Typesense cannot invent missing records. If production still has too few café, restaurant or WiFi results after this system is deployed, the next fix is data enrichment:
+
+- more real records
+- correct category tags
+- structured amenity tags
+- `hasWifi` / `freeWifi` / `publicWifi`
+- consistent cafe/café/coffee shop labels
+- consistent WiFi/free-WiFi labels

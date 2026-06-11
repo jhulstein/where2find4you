@@ -25,12 +25,50 @@ SUPABASE_SERVICE_ROLE_KEY=
 OPENAI_API_KEY=
 NEXT_PUBLIC_SITE_URL=https://where2find4you.com
 NEXT_PUBLIC_DONATION_URL=
+TYPESENSE_HOST=
+TYPESENSE_PORT=8108
+TYPESENSE_PROTOCOL=https
+TYPESENSE_API_KEY=
+TYPESENSE_SEARCH_ONLY_API_KEY=
+TYPESENSE_COLLECTION=places_v1
 ```
 
 The MVP works with local seed data without credentials.
 `NEXT_PUBLIC_DONATION_URL` is optional. Add a Stripe, PayPal, Buy Me a Coffee
 or similar donation URL when it is ready; until then the donation button points
 to the contact page.
+
+## Typesense Search
+
+Typesense is the primary Search v2 index. The database remains the source of
+truth, and the app falls back to Supabase/static search if Typesense is not
+configured or unavailable.
+
+Local Typesense:
+
+```bash
+docker compose -f docker-compose.typesense.yml up
+```
+
+Local env:
+
+```env
+TYPESENSE_HOST=localhost
+TYPESENSE_PORT=8108
+TYPESENSE_PROTOCOL=http
+TYPESENSE_API_KEY=local-typesense-admin-key
+TYPESENSE_COLLECTION=places_v1
+```
+
+Backfill/reindex:
+
+```bash
+npm run search:reindex
+```
+
+The Typesense admin key is server-only. Do not expose it with a
+`NEXT_PUBLIC_` prefix. See `SEARCH.md` for schema, ranking, synonyms and debug
+notes.
 
 ## Supabase
 

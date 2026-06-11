@@ -17,6 +17,7 @@ export async function GET(request: Request) {
   const offset = offsetParam === null ? Number.NaN : Number(offsetParam);
   const searchResult = await searchPlaces({
     category: searchParams.get("category"),
+    debug: searchParams.get("debug") === "1",
     limit: Number.isFinite(limit) ? limit : 100,
     location: searchParams.get("location"),
     offset: Number.isFinite(offset) ? offset : 0,
@@ -49,5 +50,6 @@ export async function GET(request: Request) {
     totalCount: searchResult.totalCount,
     page: searchResult.page,
     pageSize: searchResult.pageSize,
+    debug: searchParams.get("debug") === "1" ? searchResult.debug : undefined,
   });
 }

@@ -1,0 +1,14 @@
+services:
+  typesense:
+    image: typesense/typesense:latest
+    command: >
+      --data-dir /data
+      --api-key=local-typesense-admin-key
+      --enable-cors
+    ports:
+      - "8108:8108"
+    volumes:
+      - typesense-data:/data
+
+volumes:
+  typesense-data:
