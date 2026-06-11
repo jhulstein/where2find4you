@@ -205,6 +205,15 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
             <PlaceCard key={place.id} place={place} analytics={getPlaceAnalytics(place)} />
           ))}
         </div>
+        {sorted.length === 0 ? (
+          <div className="rounded-xl border border-dashed border-slate-300 bg-white p-6 text-center">
+            <h2 className="text-lg font-semibold text-slate-950">No strong matches yet</h2>
+            <p className="mt-2 text-sm leading-6 text-slate-600">
+              Try a broader search, choose Oslo, or use one of the category buttons above.
+              The public POC currently searches the places that have been added to the demo database.
+            </p>
+          </div>
+        ) : null}
       </ResponsiveContainer>
     </main>
   );
