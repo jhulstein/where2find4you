@@ -79,9 +79,8 @@ export function recommendPlaces(query: string): RecommendationResult {
         !normalizedLocation ||
         normalizeLocation(place.city) === normalizedLocation ||
         normalizeLocation(place.country) === normalizedLocation;
-      const categoryMatches = !detectedCategory || place.category === detectedCategory;
 
-      return locationMatches && (categoryMatches || trimmedQuery.length > 0);
+      return locationMatches;
     })
     .map((place) => ({ place, score: scorePlace(place, trimmedQuery, detectedCategory) }))
     .filter(({ score }) => score > 0 || !trimmedQuery)

@@ -70,7 +70,13 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
     <main>
       <ResponsiveContainer className="py-6 sm:py-8">
         <div className="mb-6 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
-          <SearchBar defaultValue={query} compact />
+          <SearchBar
+            category={category}
+            defaultValue={query}
+            compact
+            location={cityForSearch?.slug ?? params.location}
+            sort={sort}
+          />
           <div className="mt-4 grid gap-3 lg:grid-cols-[1fr_220px_220px]">
             <CategoryFilter
               activeCategory={category}

@@ -6,21 +6,43 @@ import { ArrowRight, Search } from "lucide-react";
 import { exampleSearches } from "@/lib/data/exampleSearches";
 
 type SearchBarProps = {
+  category?: string;
   defaultValue?: string;
   compact?: boolean;
+  location?: string;
+  sort?: string;
 };
 
-export function SearchBar({ defaultValue = "", compact = false }: SearchBarProps) {
+export function SearchBar({
+  category,
+  defaultValue = "",
+  compact = false,
+  location,
+  sort,
+}: SearchBarProps) {
   const router = useRouter();
   const [query, setQuery] = useState(defaultValue);
 
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const trimmed = query.trim();
+    const searchParams = new URLSearchParams();
 
     if (trimmed) {
-      router.push(`/search?q=${encodeURIComponent(trimmed)}`);
+      searchParams.set("q", trimmed);
     }
+    if (location) {
+      searchParams.set("location", location);
+    }
+    if (category) {
+      searchParams.set("category", category);
+    }
+    if (sort) {
+      searchParams.set("sort", sort);
+    }
+
+    const suffix = searchParams.toString();
+    router.push(suffix ? `/search?${suffix}` : "/search");
   }
 
   return (
