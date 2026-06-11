@@ -79,8 +79,7 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
   const filtered = basePlaces.filter((place) => {
     const locationMatches =
       !cityForSearch ||
-      normalizeLocation(place.city) === normalizeLocation(cityForSearch.name) ||
-      normalizeLocation(place.country) === normalizeLocation(cityForSearch.country);
+      normalizeLocation(place.city) === normalizeLocation(cityForSearch.name);
     return matchesSearchFilter(place, category) && locationMatches;
   });
   const relevanceRank = new Map(
@@ -247,7 +246,7 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
             <h2 className="text-lg font-semibold text-slate-950">No strong matches yet</h2>
             <p className="mt-2 text-sm leading-6 text-slate-600">
               Try a broader search, choose Oslo, or use one of the category buttons above.
-              The public POC currently searches the places that have been added to the demo database.
+              The public POC searches demo listings and OpenStreetMap results where available.
             </p>
           </div>
         ) : null}

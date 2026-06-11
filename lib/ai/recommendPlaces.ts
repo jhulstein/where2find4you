@@ -233,8 +233,7 @@ export function recommendPlaces(query: string): RecommendationResult {
     .filter((place) => {
       const locationMatches =
         !normalizedLocation ||
-        normalizeLocation(place.city) === normalizedLocation ||
-        normalizeLocation(place.country) === normalizedLocation;
+        normalizeLocation(place.city) === normalizedLocation;
 
       return locationMatches;
     })
