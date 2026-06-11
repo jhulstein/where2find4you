@@ -1,83 +1,38 @@
 import { NextResponse } from "next/server";
-import { recommendPlaces } from "@/lib/ai/recommendPlaces";
-import { getPlaceAnalytics } from "@/lib/analytics";
-import { getCityBySearchTerm, normalizeLocation } from "@/lib/data/cities";
-import { activePlaces } from "@/lib/data/places";
-import { compareRankedPlaces, normalizeQuery, rankPlaces } from "@/lib/search/ranking";
-import { matchesSearchFilter, normalizeSearchFilter } from "@/lib/searchFilters";
-import { searchSupabasePlaces } from "@/lib/supabase/search";
+import { searchPlaces } from "@/lib/search/searchService";
 import { createSearchRecord, logImpressions } from "@/lib/tracking";
 
 export async function GET(request: Request) {
   const startedAt = Date.now();
   const { searchParams } = new URL(request.url);
-  const query = normalizeQuery(searchParams.get("q") ?? "");
-  const category = normalizeSearchFilter(searchParams.get("category") ?? undefined);
-  const sort = searchParams.get("sort") ?? "relevance";
-  const result = recommendPlaces(query);
-  const cityForSearch =
-    getCityBySearchTerm(searchParams.get("location")) ??
-    getCityBySearchTerm(query) ??
-    getCityBySearchTerm(result.detectedLocation);
   const userLatitude = Number(searchParams.get("lat"));
   const userLongitude = Number(searchParams.get("lon"));
   const userLocation =
     Number.isFinite(userLatitude) && Number.isFinite(userLongitude)
       ? { latitude: userLatitude, longitude: userLongitude }
       : null;
-  const databaseSearch = await searchSupabasePlaces({
-    category,
-    limit: 100,
-    location: cityForSearch,
-    query,
+  const limitParam = searchParams.get("limit");
+  const offsetParam = searchParams.get("offset");
+  const limit = limitParam === null ? Number.NaN : Number(limitParam);
+  const offset = offsetParam === null ? Number.NaN : Number(offsetParam);
+  const searchResult = await searchPlaces({
+    category: searchParams.get("category"),
+    limit: Number.isFinite(limit) ? limit : 100,
+    location: searchParams.get("location"),
+    offset: Number.isFinite(offset) ? offset : 0,
+    query: searchParams.get("q"),
+    sort: searchParams.get("sort"),
     userLocation,
   });
-  const basePlaces = databaseSearch?.places ?? activePlaces;
-  const filtered = basePlaces.filter((place) => {
-    const locationMatches =
-      !cityForSearch ||
-      normalizeLocation(place.city) === normalizeLocation(cityForSearch.name);
-    return matchesSearchFilter(place, category) && locationMatches;
-  });
-  const ranked = rankPlaces(filtered, {
-    category,
-    getPopularityScore: (place) => getPlaceAnalytics(place).impressions,
-    location: cityForSearch,
-    query,
-    userLocation,
-  }).filter((item) => item.isRelevant || !query);
-  const sorted = [...ranked].sort((a, b) => {
-    if (!query && category === "all" && !cityForSearch) {
-      return b.place.sponsoredPriority - a.place.sponsoredPriority;
-    }
-
-    if (sort === "popularity" && !query) {
-      return (
-        getPlaceAnalytics(b.place).impressions - getPlaceAnalytics(a.place).impressions ||
-        compareRankedPlaces(a, b)
-      );
-    }
-
-    if (sort === "newest" && !query) {
-      return Date.parse(b.place.createdAt) - Date.parse(a.place.createdAt) || compareRankedPlaces(a, b);
-    }
-
-    return compareRankedPlaces(a, b);
-  });
-  const results = sorted.map((item) => item.place);
+  const results = searchResult.results;
   const search = await createSearchRecord({
     query: searchParams.get("q")?.trim() || "all places",
-    normalizedQuery: query,
-    detectedCategory: result.detectedCategory,
-    detectedLocation: result.detectedLocation,
-    resultCount: results.length,
-    filtersUsed: {
-      category,
-      location: cityForSearch?.slug ?? searchParams.get("location") ?? null,
-      sort,
-      source: databaseSearch ? "supabase" : "static",
-    },
-    userLocationAvailable: Boolean(userLocation),
+    normalizedQuery: searchResult.normalizedQuery,
+    detectedCategory: searchResult.detectedCategory,
+    detectedLocation: searchResult.detectedLocation,
+    resultCount: searchResult.totalCount,
+    filtersUsed: searchResult.filtersUsed,
+    userLocationAvailable: searchResult.userLocationAvailable,
     latencyMs: Date.now() - startedAt,
     sessionId: request.headers.get("x-session-id") ?? undefined,
   });
@@ -87,5 +42,12 @@ export async function GET(request: Request) {
     sessionId: search.sessionId,
   });
 
-  return NextResponse.json({ search, impressions, results });
+  return NextResponse.json({
+    search,
+    impressions,
+    results,
+    totalCount: searchResult.totalCount,
+    page: searchResult.page,
+    pageSize: searchResult.pageSize,
+  });
 }

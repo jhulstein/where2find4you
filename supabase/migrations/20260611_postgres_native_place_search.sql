@@ -1,6 +1,7 @@
 create schema if not exists extensions;
 create extension if not exists pg_trgm with schema extensions;
 create extension if not exists postgis with schema extensions;
+create extension if not exists unaccent with schema extensions;
 
 set search_path = public, extensions;
 
@@ -13,9 +14,29 @@ as $$
   select trim(
     regexp_replace(
       regexp_replace(
-        lower(coalesce(query, '')),
-        'wi[[:space:]-]?fi',
-        'wifi',
+        regexp_replace(
+          regexp_replace(
+            regexp_replace(
+              regexp_replace(
+                lower(unaccent(coalesce(query, ''))),
+                '[’‘]',
+                '''',
+                'g'
+              ),
+              '([[:alnum:]]+)''s([^[:alnum:]]|$)',
+              '\1\2',
+              'g'
+            ),
+            'wi[[:space:]-]*fi+',
+            'wifi',
+            'g'
+          ),
+          '[^a-z0-9]+',
+          ' ',
+          'g'
+        ),
+        '\mcafes\M',
+        'cafe',
         'g'
       ),
       '[[:space:]]+',
@@ -198,8 +219,14 @@ as $$
       scored.*,
       case
         when q = '' then 0
-        when normalized_name = q then 70
-        when normalized_name like q || '%' then 60
+        when normalized_name = q then 120
+        when normalized_category = q then 110
+        when normalized_tags like '%' || q || '%' then 85
+        when normalized_name like q || '%' then 80
+        when normalized_category like '%' || q || '%'
+          or similarity(normalized_category, q) >= 0.18
+          or word_similarity(q, normalized_category) >= 0.18
+          then 70
         when normalized_name like '%' || q || '%'
           or not exists (
             select 1
@@ -210,14 +237,10 @@ as $$
               or word_similarity(query_term, normalized_name) >= 0.18
             )
           )
-          then 50
-        when normalized_category like '%' || q || '%'
-          or normalized_tags like '%' || q || '%'
-          or similarity(normalized_category, q) >= 0.18
-          or similarity(normalized_tags, q) >= 0.18
-          or word_similarity(q, normalized_category) >= 0.18
+          then 55
+        when similarity(normalized_tags, q) >= 0.18
           or word_similarity(q, normalized_tags) >= 0.18
-          then 40
+          then 55
         when normalized_description like '%' || q || '%'
           or similarity(normalized_description, q) >= 0.12
           or word_similarity(q, normalized_description) >= 0.16
@@ -228,27 +251,30 @@ as $$
         when q = '' then 0
         else
           case when normalized_name = q then 12000 else 0 end +
-          case when normalized_name like q || '%' then 8500 else 0 end +
-          case when normalized_name like '%' || q || '%' then 6200 else 0 end +
+          case when normalized_category = q then 11000 else 0 end +
+          case when normalized_tags like '%' || q || '%' then 8500 else 0 end +
+          case when normalized_name like q || '%' then 8000 else 0 end +
+          case when normalized_category like '%' || q || '%' then 7000 else 0 end +
+          case when normalized_name like '%' || q || '%' then 5500 else 0 end +
           greatest(
             similarity(normalized_name, q),
             word_similarity(q, normalized_name)
-          ) * 900 +
+          ) * 550 +
           greatest(
             similarity(normalized_category, q),
             similarity(normalized_tags, q),
             word_similarity(q, normalized_category),
             word_similarity(q, normalized_tags)
-          ) * 650 +
+          ) * 700 +
           greatest(
             similarity(normalized_description, q),
             word_similarity(q, normalized_description)
-          ) * 220 +
+          ) * 300 +
           case when normalized_all like '%' || q || '%' then 120 else 0 end
       end as text_score,
       case
         when distance_meters is null then 0
-        else greatest(0, 360 - (distance_meters / 100.0))
+        else greatest(0, 20 - ((distance_meters / 1000.0) * 2))
       end as distance_score
     from scored
     where q = ''
@@ -266,10 +292,10 @@ as $$
       ranked.*,
       text_score +
         distance_score +
-        least(popularity_score, 100)::double precision * 0.1 +
-        verified_score::double precision * 25 +
-        coalesce(rating, 0)::double precision * 8 +
-        least(coalesce(sponsored_priority, 0), 3) as relevance_score,
+        least(popularity_score, 100)::double precision * 0.02 +
+        verified_score::double precision +
+        least(coalesce(rating, 0)::double precision, 5) +
+        least(coalesce(sponsored_priority, 0), 2) as relevance_score,
       count(*) over () as total_count
     from ranked
   )
@@ -312,9 +338,9 @@ as $$
   cross join params
   order by
     case when q = '' then 0 else match_tier end desc,
+    case when q = '' then 0 else text_score end desc,
     distance_score desc,
     distance_meters asc nulls last,
-    case when q = '' then 0 else text_score end desc,
     popularity_score desc,
     verified_score desc,
     freshness_score desc,

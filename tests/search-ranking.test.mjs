@@ -200,7 +200,7 @@ test("exact name search returns the exact place first", () => {
   assert.equal(topId("Quiet Corner Café"), "quiet-corner-cafe");
 });
 
-test("ranking hierarchy follows exact, prefix, fuzzy, category/tag, description", () => {
+test("ranking hierarchy follows exact, structured/tag, prefix, fuzzy, description", () => {
   const hierarchyRecords = [
     place({
       id: "alpha-exact",
@@ -244,9 +244,9 @@ test("ranking hierarchy follows exact, prefix, fuzzy, category/tag, description"
 
   assert.deepEqual(ranked, [
     "alpha-exact",
+    "alpha-tag",
     "alpha-prefix",
     "alpha-fuzzy-name",
-    "alpha-tag",
     "alpha-description",
   ]);
 });

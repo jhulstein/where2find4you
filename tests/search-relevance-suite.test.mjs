@@ -314,7 +314,7 @@ test("filtered search keeps category and city filters active", () => {
   const cafeResult = runSearch({ category: "cafes", location: oslo, query: "wifi" });
   const bergenCafeResult = runSearch({ category: "cafes", location: bergen, query: "wifi" });
 
-  assert.deepEqual(cafeResult.ids, ["quiet-corner-cafe", "oslo-coffee-roasters"]);
+  assert.deepEqual(cafeResult.ids, ["quiet-corner-cafe"]);
   assert.deepEqual(bergenCafeResult.ids, []);
 });
 

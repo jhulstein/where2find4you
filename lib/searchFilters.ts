@@ -1,4 +1,5 @@
 import { categoryOptions } from "@/lib/data/places";
+import { placeMatchesFilterId } from "@/lib/search/ranking";
 import type { Place, PlaceCategory } from "@/lib/types";
 
 export type SearchFilterId = "all" | "free-wifi" | "rooftops" | PlaceCategory;
@@ -8,8 +9,6 @@ export type SearchFilterOption = {
   label: string;
   description: string;
 };
-
-const placeCategoryIds = new Set(categoryOptions.map((category) => category.id));
 
 export const searchFilterOptions: SearchFilterOption[] = [
   {
@@ -39,27 +38,5 @@ export function normalizeSearchFilter(value: string | undefined): SearchFilterId
 }
 
 export function matchesSearchFilter(place: Place, filter: SearchFilterId) {
-  if (filter === "all") {
-    return true;
-  }
-
-  if (filter === "free-wifi") {
-    const text = [place.name, place.shortDescription, place.description, ...place.tags]
-      .join(" ")
-      .toLowerCase();
-    return text.includes("wifi") || text.includes("wi-fi") || text.includes("free-wifi");
-  }
-
-  if (filter === "rooftops") {
-    const text = [place.name, place.shortDescription, place.description, ...place.tags]
-      .join(" ")
-      .toLowerCase();
-    return text.includes("rooftop") || text.includes("roof top");
-  }
-
-  if (placeCategoryIds.has(filter)) {
-    return place.category === filter;
-  }
-
-  return true;
+  return placeMatchesFilterId(place, filter);
 }

@@ -6,19 +6,10 @@ import { PlaceMap } from "@/components/PlaceMap";
 import { ResponsiveContainer } from "@/components/ResponsiveContainer";
 import { SearchBar } from "@/components/SearchBar";
 import { getPlaceAnalytics } from "@/lib/analytics";
-import { cities, getCityBySearchTerm, normalizeLocation } from "@/lib/data/cities";
-import { activePlaces } from "@/lib/data/places";
-import { recommendPlaces } from "@/lib/ai/recommendPlaces";
-import { compareRankedPlaces, normalizeQuery, rankPlaces } from "@/lib/search/ranking";
-import { searchOsmPlaces } from "@/lib/search/osmPlaces";
-import { searchSupabasePlaces } from "@/lib/supabase/search";
-import {
-  matchesSearchFilter,
-  normalizeSearchFilter,
-  searchFilterOptions,
-} from "@/lib/searchFilters";
+import { cities } from "@/lib/data/cities";
+import { searchPlaces } from "@/lib/search/searchService";
+import { searchFilterOptions } from "@/lib/searchFilters";
 import { createSearchRecord, logImpressions } from "@/lib/tracking";
-import type { Place } from "@/lib/types";
 
 type SearchPageProps = {
   searchParams: Promise<{
@@ -29,113 +20,28 @@ type SearchPageProps = {
   }>;
 };
 
-function placeMergeKey(place: Place) {
-  return [
-    place.name.trim().toLowerCase(),
-    place.city.trim().toLowerCase(),
-    place.latitude.toFixed(4),
-    place.longitude.toFixed(4),
-  ].join("-");
-}
-
-function mergePlaces(...placeGroups: Place[][]) {
-  const seen = new Set<string>();
-
-  return placeGroups.flat().filter((place) => {
-    const key = placeMergeKey(place);
-
-    if (seen.has(key)) {
-      return false;
-    }
-
-    seen.add(key);
-    return true;
-  });
-}
-
 export default async function SearchPage({ searchParams }: SearchPageProps) {
   const params = await searchParams;
-  const query = normalizeQuery(params.q ?? "");
-  const category = normalizeSearchFilter(params.category);
-  const sort = params.sort ?? "relevance";
-  const recommendation = query ? recommendPlaces(query) : { ...recommendPlaces(""), places: activePlaces };
-  const selectedCity =
-    getCityBySearchTerm(params.location) ??
-    getCityBySearchTerm(query) ??
-    getCityBySearchTerm(recommendation.detectedLocation);
-  const defaultFilterCity = category !== "all" ? cities[0] : null;
-  const cityForSearch =
-    selectedCity ?? getCityBySearchTerm(recommendation.detectedLocation) ?? defaultFilterCity;
-  const databaseSearch = await searchSupabasePlaces({
-    category,
-    limit: 80,
-    location: cityForSearch,
-    query,
+  const searchResult = await searchPlaces({
+    category: params.category,
+    limit: 120,
+    location: params.location,
+    query: params.q,
+    sort: params.sort,
   });
-  const usesDatabase = databaseSearch !== null;
-  const shouldFetchOsmPlaces = !usesDatabase && Boolean(cityForSearch && (query || category !== "all"));
-  const osmPlaces = shouldFetchOsmPlaces
-    ? await searchOsmPlaces({
-        category,
-        city: cityForSearch,
-        detectedCategory: recommendation.detectedCategory,
-        limit: 36,
-        query,
-      })
-    : [];
-  const staticBasePlaces = usesDatabase ? databaseSearch.places : activePlaces;
-  const basePlaces = mergePlaces(staticBasePlaces, osmPlaces);
-  const filtered = basePlaces.filter((place) => {
-    const locationMatches =
-      !cityForSearch ||
-      normalizeLocation(place.city) === normalizeLocation(cityForSearch.name);
-    return matchesSearchFilter(place, category) && locationMatches;
-  });
-  const ranked = rankPlaces(filtered, {
-    category,
-    getPopularityScore: (place) => getPlaceAnalytics(place).impressions,
-    location: cityForSearch,
-    query,
-  }).filter((item) => item.isRelevant || !query);
-  const sortedRanks = [...ranked].sort((a, b) => {
-    if (!query && category === "all" && !cityForSearch) {
-      return b.place.sponsoredPriority - a.place.sponsoredPriority;
-    }
-
-    if (sort === "popularity") {
-      if (query) {
-        return compareRankedPlaces(a, b);
-      }
-
-      return (
-        getPlaceAnalytics(b.place).impressions - getPlaceAnalytics(a.place).impressions ||
-        compareRankedPlaces(a, b)
-      );
-    }
-    if (sort === "newest") {
-      if (query) {
-        return compareRankedPlaces(a, b);
-      }
-
-      return Date.parse(b.place.createdAt) - Date.parse(a.place.createdAt) || compareRankedPlaces(a, b);
-    }
-
-    return compareRankedPlaces(a, b);
-  });
-  const sorted = sortedRanks.map((item) => item.place);
+  const query = searchResult.normalizedQuery;
+  const category = searchResult.category;
+  const sort = searchResult.sort;
+  const cityForSearch = searchResult.city;
+  const sorted = searchResult.results;
   const searchRecord = await createSearchRecord({
     query: params.q?.trim() || "all places",
     normalizedQuery: query,
-    detectedCategory: recommendation.detectedCategory,
-    detectedLocation: recommendation.detectedLocation,
-    resultCount: sorted.length,
-    filtersUsed: {
-      category,
-      location: cityForSearch?.slug ?? params.location ?? null,
-      sort,
-      source: usesDatabase ? "supabase" : shouldFetchOsmPlaces ? "openstreetmap-fallback" : "static",
-    },
-    userLocationAvailable: false,
+    detectedCategory: searchResult.detectedCategory,
+    detectedLocation: searchResult.detectedLocation,
+    resultCount: searchResult.totalCount,
+    filtersUsed: searchResult.filtersUsed,
+    userLocationAvailable: searchResult.userLocationAvailable,
     latencyMs: null,
   });
   await logImpressions({
@@ -230,7 +136,7 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
             <p className="mt-1 text-sm text-slate-600">
               City: <span className="font-semibold text-slate-800">{cityLabel}</span>.
               {" "}
-              {sorted.length} matching places. Sponsored listings are clearly marked.
+              {searchResult.totalCount} matching places. Sponsored listings are clearly marked.
             </p>
           </div>
           <a

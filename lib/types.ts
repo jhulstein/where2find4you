@@ -47,6 +47,11 @@ export type Place = {
   source: "seed" | "openstreetmap" | "manual";
   sourceId: string | null;
   tags: string[];
+  amenities?: string[];
+  features?: string[];
+  hasWifi?: boolean;
+  freeWifi?: boolean;
+  isVerified?: boolean;
   isSponsored: boolean;
   sponsoredPriority: number;
   isActive: boolean;
