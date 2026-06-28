@@ -37,6 +37,10 @@ export function PlaceMap({
   subtitle,
   updateSearchOnLocate = false,
 }: PlaceMapProps) {
+  const mapKey = initialUserLocation
+    ? `user-${initialUserLocation.latitude}-${initialUserLocation.longitude}`
+    : `city-${city?.id ?? "all"}`;
+
   return (
     <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
       {title ? (
@@ -50,6 +54,7 @@ export function PlaceMap({
       <div className={heightClassName}>
         <LeafletMap
           city={city}
+          key={mapKey}
           initialUserLocation={initialUserLocation}
           places={places}
           preferUserLocation={preferUserLocation}

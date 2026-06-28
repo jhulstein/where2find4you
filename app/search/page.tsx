@@ -33,7 +33,7 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
   const latitude = parseCoordinate(params.lat);
   const longitude = parseCoordinate(params.lon);
   const userLocation =
-    latitude !== null && longitude !== null
+    !params.location && latitude !== null && longitude !== null
       ? { latitude, longitude }
       : null;
   const searchResult = await searchPlaces({
@@ -48,6 +48,7 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
   const category = searchResult.category;
   const sort = searchResult.sort;
   const cityForSearch = searchResult.city;
+  const activeUserLocation = searchResult.userLocationAvailable ? userLocation : null;
   const sorted = searchResult.results;
   const searchRecord = await createSearchRecord({
     query: params.q?.trim() || "all places",
@@ -66,7 +67,7 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
   const mapPlaces = sorted.slice(0, 20);
   const cityLabel = cityForSearch
     ? `${cityForSearch.name}, ${cityForSearch.country}`
-    : userLocation
+    : activeUserLocation
       ? "Near your position"
     : "All pilot cities";
   const activeFilter = searchFilterOptions.find((option) => option.id === category);
@@ -75,7 +76,7 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
     : category === "all"
       ? "Explore places"
       : `${activeFilter?.label ?? "Places"} ${
-          cityForSearch ? `in ${cityForSearch.name}` : userLocation ? "near you" : "in pilot cities"
+          cityForSearch ? `in ${cityForSearch.name}` : activeUserLocation ? "near you" : "in pilot cities"
         }`;
   const donationUrl = process.env.NEXT_PUBLIC_DONATION_URL ?? "/contact?reason=donation";
   const donationIsExternal = donationUrl.startsWith("http");
@@ -88,17 +89,17 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
             category={category}
             defaultValue={query}
             compact
-            latitude={userLocation?.latitude ?? null}
-            location={userLocation ? undefined : cityForSearch?.slug ?? params.location}
-            longitude={userLocation?.longitude ?? null}
+            latitude={activeUserLocation?.latitude ?? null}
+            location={activeUserLocation ? undefined : cityForSearch?.slug ?? params.location}
+            longitude={activeUserLocation?.longitude ?? null}
             sort={sort}
           />
           <div className="mt-4 grid gap-3 lg:grid-cols-[1fr_220px_220px]">
             <CategoryFilter
               activeCategory={category}
-              latitude={userLocation?.latitude ?? null}
-              location={userLocation ? undefined : cityForSearch?.slug ?? params.location}
-              longitude={userLocation?.longitude ?? null}
+              latitude={activeUserLocation?.latitude ?? null}
+              location={activeUserLocation ? undefined : cityForSearch?.slug ?? params.location}
+              longitude={activeUserLocation?.longitude ?? null}
               query={query}
               sort={sort}
             />
@@ -121,10 +122,10 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
               <input type="hidden" name="category" value={category} />
               {cityForSearch ? (
                 <input type="hidden" name="location" value={cityForSearch.slug} />
-              ) : userLocation ? (
+              ) : activeUserLocation ? (
                 <>
-                  <input type="hidden" name="lat" value={String(userLocation.latitude)} />
-                  <input type="hidden" name="lon" value={String(userLocation.longitude)} />
+                  <input type="hidden" name="lat" value={String(activeUserLocation.latitude)} />
+                  <input type="hidden" name="lon" value={String(activeUserLocation.longitude)} />
                 </>
               ) : null}
               <select
@@ -180,9 +181,9 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
 
         <PlaceMap
           places={mapPlaces}
-          city={userLocation ? undefined : cityForSearch ?? undefined}
-          initialUserLocation={userLocation}
-          preferUserLocation
+          city={activeUserLocation ? undefined : cityForSearch ?? undefined}
+          initialUserLocation={activeUserLocation}
+          preferUserLocation={Boolean(activeUserLocation)}
           showLocationControl
           title="Map view"
           subtitle={

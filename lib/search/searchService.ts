@@ -285,6 +285,7 @@ export async function searchPlaces(input: SearchServiceInput = {}): Promise<Sear
   const category = normalizeSearchFilter(input.category ?? undefined);
   const sort = normalizeSort(input.sort);
   const city = findSearchCity(input, normalizedQuery, category);
+  const effectiveUserLocation = city ? null : input.userLocation;
   const pageSize = pageSizeFor(input);
   const offset = offsetFor(input, pageSize);
   const page = Math.floor(offset / pageSize) + 1;
@@ -300,7 +301,7 @@ export async function searchPlaces(input: SearchServiceInput = {}): Promise<Sear
     query: normalizedQuery,
     radiusKm,
     sort,
-    userLocation: input.userLocation,
+    userLocation: effectiveUserLocation,
   });
 
   if (typesenseSearch) {
@@ -329,7 +330,7 @@ export async function searchPlaces(input: SearchServiceInput = {}): Promise<Sear
       source: "typesense",
       sort,
       totalCount: typesenseSearch.totalCount,
-      userLocationAvailable: Boolean(input.userLocation),
+      userLocationAvailable: Boolean(effectiveUserLocation),
     };
   }
 
@@ -343,5 +344,6 @@ export async function searchPlaces(input: SearchServiceInput = {}): Promise<Sear
     pageSize,
     radiusKm,
     sort,
+    userLocation: effectiveUserLocation,
   });
 }
