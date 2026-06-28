@@ -38,7 +38,14 @@ export const searchIntents: Record<string, {
   terms: string[];
 }>;
 
+export const DEFAULT_SEARCH_RADIUS_KM: number;
+
 export function normalizeQuery(value?: string): string;
+
+export function distanceKm(
+  first: SearchCoordinates | null | undefined,
+  second: SearchCoordinates | null | undefined,
+): number | null;
 
 export function singularizeSearchTerm(term: string): string;
 
@@ -62,6 +69,7 @@ export function rankPlaces(
     location?: City | null;
     query?: string;
     getPopularityScore?: (place: Place) => number;
+    maxRadiusKm?: number;
     userLocation?: SearchCoordinates | null;
   },
 ): RankedPlace[];
@@ -73,6 +81,7 @@ export function searchPlaceRecords(
     location?: City | null;
     query?: string;
     getPopularityScore?: (place: Place) => number;
+    maxRadiusKm?: number;
     userLocation?: SearchCoordinates | null;
     sort?: "relevance" | "popularity" | "newest" | string | null;
     offset?: number;

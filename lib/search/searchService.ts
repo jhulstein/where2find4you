@@ -3,6 +3,7 @@ import { cities, getCityBySearchTerm } from "@/lib/data/cities";
 import { activePlaces } from "@/lib/data/places";
 import { searchOsmPlaces } from "@/lib/search/osmPlaces";
 import {
+  DEFAULT_SEARCH_RADIUS_KM,
   detectSearchIntent,
   normalizeQuery,
   searchPlaceRecords,
@@ -31,6 +32,7 @@ export type SearchServiceInput = {
   includeOsmFallback?: boolean;
   limit?: number;
   location?: string | null;
+  maxRadiusKm?: number | null;
   offset?: number;
   page?: number;
   pageSize?: number;
@@ -116,6 +118,16 @@ function offsetFor(input: SearchServiceInput, pageSize: number) {
   return 0;
 }
 
+function radiusFor(input: SearchServiceInput) {
+  const requested = input.maxRadiusKm;
+
+  if (!Number.isFinite(requested)) {
+    return DEFAULT_SEARCH_RADIUS_KM;
+  }
+
+  return Math.max(1, Math.min(Math.trunc(requested ?? DEFAULT_SEARCH_RADIUS_KM), 100));
+}
+
 function findSearchCity(input: SearchServiceInput, normalizedQuery: string, category: SearchFilterId) {
   const selectedCity =
     getCityBySearchTerm(input.location) ??
@@ -139,6 +151,7 @@ async function searchFallbackPlaces(input: SearchServiceInput & {
   offset: number;
   page: number;
   pageSize: number;
+  radiusKm: number;
   sort: SearchSort;
 }): Promise<SearchServiceResult> {
   const {
@@ -148,6 +161,7 @@ async function searchFallbackPlaces(input: SearchServiceInput & {
     offset,
     page,
     pageSize,
+    radiusKm,
     sort,
   } = input;
   const intent = detectSearchIntent(normalizedQuery);
@@ -159,6 +173,7 @@ async function searchFallbackPlaces(input: SearchServiceInput & {
       location: city,
       offset: 0,
       query: normalizedQuery,
+      radiusKm,
       userLocation: input.userLocation,
     }),
   ];
@@ -174,6 +189,7 @@ async function searchFallbackPlaces(input: SearchServiceInput & {
         location: city,
         offset: 0,
         query: "",
+        radiusKm,
         userLocation: input.userLocation,
       }),
     );
@@ -187,6 +203,7 @@ async function searchFallbackPlaces(input: SearchServiceInput & {
         location: city,
         offset: 0,
         query: "wifi",
+        radiusKm,
         userLocation: input.userLocation,
       }),
     );
@@ -219,6 +236,7 @@ async function searchFallbackPlaces(input: SearchServiceInput & {
     getPopularityScore: (place) => getPlaceAnalytics(place).impressions,
     limit: pageSize,
     location: city,
+    maxRadiusKm: radiusKm,
     offset,
     query: normalizedQuery,
     sort,
@@ -243,6 +261,7 @@ async function searchFallbackPlaces(input: SearchServiceInput & {
       offset,
       page,
       pageSize,
+      radiusKm,
       sort,
       source,
     },
@@ -269,6 +288,7 @@ export async function searchPlaces(input: SearchServiceInput = {}): Promise<Sear
   const pageSize = pageSizeFor(input);
   const offset = offsetFor(input, pageSize);
   const page = Math.floor(offset / pageSize) + 1;
+  const radiusKm = radiusFor(input);
   const typesenseSearch = await searchTypesensePlaces({
     category,
     debug: input.debug,
@@ -278,6 +298,7 @@ export async function searchPlaces(input: SearchServiceInput = {}): Promise<Sear
     page,
     pageSize,
     query: normalizedQuery,
+    radiusKm,
     sort,
     userLocation: input.userLocation,
   });
@@ -295,6 +316,7 @@ export async function searchPlaces(input: SearchServiceInput = {}): Promise<Sear
         offset,
         page,
         pageSize,
+        radiusKm,
         sort,
         source: "typesense",
       },
@@ -319,6 +341,7 @@ export async function searchPlaces(input: SearchServiceInput = {}): Promise<Sear
     offset,
     page,
     pageSize,
+    radiusKm,
     sort,
   });
 }

@@ -121,6 +121,7 @@ export async function searchTypesensePlaces(input: {
   page?: number;
   pageSize?: number;
   query: string;
+  radiusKm?: number | null;
   sort?: string | null;
   userLocation?: { latitude: number; longitude: number } | null;
 }): Promise<TypesensePlaceSearchResult | null> {

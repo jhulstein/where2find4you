@@ -90,7 +90,9 @@ test("Typesense query builder applies normalization, field priorities and WiFi i
     offset: 0,
     pageSize: 20,
     query: " free  wifii ",
+    radiusKm: 15,
     sort: "relevance",
+    userLocation: oslo,
   });
 
   assert.equal(parameters.q, "free wifi");
@@ -99,6 +101,7 @@ test("Typesense query builder applies normalization, field priorities and WiFi i
   assert.match(parameters.query_by_weights, /^14,13,12/);
   assert.match(parameters.filter_by, /isActive:=true/);
   assert.match(parameters.filter_by, /city:=`Oslo`/);
+  assert.match(parameters.filter_by, /location:\(59\.9139, 10\.7522, 15 km\)/);
   assert.match(parameters.filter_by, /freeWifi:=true/);
   assert.match(parameters.sort_by, /^_text_match:desc/);
   assert.match(parameters.sort_by, /location\(59\.9139, 10\.7522\):asc/);

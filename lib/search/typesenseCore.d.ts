@@ -58,6 +58,7 @@ export type TypesenseSearchBuildInput = {
   page?: number | null;
   pageSize?: number;
   query?: string | null;
+  radiusKm?: number | null;
   sort?: string | null;
   userLocation?: { latitude: number; longitude: number } | null;
 };

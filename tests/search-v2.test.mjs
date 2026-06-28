@@ -133,6 +133,18 @@ const places = [
     tags: ["kafe", "coffee", "harbor"],
   }),
   place({
+    id: "sponsored-bergen-restaurant",
+    name: "Sponsored Bergen Restaurant",
+    category: "restaurants",
+    city: "Bergen",
+    description: "Sponsored restaurant near Bergen harbor.",
+    isSponsored: true,
+    latitude: 60.397,
+    longitude: 5.324,
+    sponsoredPriority: 99,
+    tags: ["restaurant", "sponsored", "dinner"],
+  }),
+  place({
     id: "harbor-hotel-lobby",
     name: "Harbor Hotel Lobby",
     category: "hotels",
@@ -250,8 +262,8 @@ test("normalizer handles accents, possessives, punctuation, plurals and WiFi var
   assert.equal(normalizeQuery("no-cost internet"), "no cost internet");
 });
 
-test("cafe intent variants return all cafe and coffee-shop records", () => {
-  const queries = [
+test("cafe intent variants return matching cafe and coffee-shop records", () => {
+  const broadCafeQueries = [
     "cafe",
     "cafes",
     "café",
@@ -261,27 +273,24 @@ test("cafe intent variants return all cafe and coffee-shop records", () => {
     "coffee",
     "coffee shop",
     "coffeehouse",
-    "espresso bar",
     "kafé",
     "kaffebar",
   ];
 
-  for (const query of queries) {
+  for (const query of broadCafeQueries) {
     const ids = idsFor(query);
     for (const id of cafeIds) {
       assert.equal(ids.includes(id), true, `${query} should include ${id}`);
     }
     assert.equal(ids.indexOf("waterfront-table") === -1 || ids.indexOf("waterfront-table") > 4, true);
   }
+
+  assert.deepEqual(idsFor("espresso bar"), ["espresso-harbor-bar"]);
 });
 
 test("free WiFi and WiFi variants return structured WiFi places", () => {
-  const queries = [
+  const freeWifiQueries = [
     "free WiFi",
-    "wifi",
-    "wi-fi",
-    "wireless internet",
-    "wlan",
     "free wifii",
     "complimentary wifi",
     "public wifi",
@@ -289,7 +298,16 @@ test("free WiFi and WiFi variants return structured WiFi places", () => {
     "included wifi",
   ];
 
-  for (const query of queries) {
+  for (const query of freeWifiQueries) {
+    const ids = idsFor(query);
+    for (const id of wifiIds.filter((id) => id !== "fjord-visitor-center")) {
+      assert.equal(ids.includes(id), true, `${query} should include ${id}`);
+    }
+    assert.equal(ids.includes("fjord-visitor-center"), false, `${query} should not include WLAN-only places`);
+    assert.equal(ids.includes("waterfront-table"), false, `${query} should not include non-WiFi restaurant`);
+  }
+
+  for (const query of ["wifi", "wi-fi", "wireless internet", "wlan"]) {
     const ids = idsFor(query);
     for (const id of wifiIds) {
       assert.equal(ids.includes(id), true, `${query} should include ${id}`);
@@ -312,12 +330,15 @@ test("restaurant intent variants include English, Norwegian and Swedish terms", 
     "mat",
   ];
 
-  for (const query of queries) {
+  for (const query of queries.filter((query) => !["mat", "spisested"].includes(query))) {
     const ids = idsFor(query);
     for (const id of restaurantIds) {
       assert.equal(ids.includes(id), true, `${query} should include ${id}`);
     }
   }
+
+  assert.deepEqual(idsFor("mat"), ["fjord-dinner-house"]);
+  assert.deepEqual(idsFor("spisested"), ["fjord-dinner-house"]);
 });
 
 test("ranking keeps exact name and structured matches above description-only matches", () => {
@@ -327,7 +348,7 @@ test("ranking keeps exact name and structured matches above description-only mat
 
   assert.equal(cafeResults[0], "quiet-corner-cafe");
   assert.equal(wifiResults.slice(0, 4).includes("quiet-corner-cafe"), true);
-  assert.equal(wifiResults.indexOf("harbor-hotel-lobby") < wifiResults.indexOf("fjord-visitor-center"), true);
+  assert.equal(wifiResults.indexOf("harbor-hotel-lobby") < wifiResults.indexOf("wifi-mentioned-gallery"), true);
   assert.equal(coffeeResults.indexOf("coffee-mentioned-bookshop") > 4, true);
   assert.equal(wifiResults.indexOf("wifi-mentioned-gallery") > wifiResults.indexOf("quiet-corner-cafe"), true);
   assert.equal(wifiResults.indexOf("wifi-mentioned-gallery") > wifiResults.indexOf("library-hotspot"), true);
@@ -369,4 +390,22 @@ test("location-aware search narrows and ranks by searched city", () => {
   assert.equal(osloCafeIds.includes("bergen-kafe"), false);
   assert.equal(bergenCafeIds[0], "bergen-kafe");
   assert.deepEqual(bergenCafeIds, ["bergen-kafe"]);
+});
+
+test("near-me search strictly filters by radius before sponsorship", () => {
+  const ids = idsFor("restaurant", {
+    userLocation: oslo,
+  });
+
+  assert.equal(ids.includes("waterfront-table"), true);
+  assert.equal(ids.includes("fjord-dinner-house"), true);
+  assert.equal(ids.includes("sponsored-bergen-restaurant"), false);
+});
+
+test("keyword search excludes places that do not match the query text", () => {
+  const ids = idsFor("mat", {
+    userLocation: oslo,
+  });
+
+  assert.deepEqual(ids, ["fjord-dinner-house"]);
 });

@@ -37,6 +37,7 @@ test("search function uses pg_trgm typo tolerance and distance ranking", () => {
   assert.match(sql, /word_similarity\(/i);
   assert.match(sql, /st_distance\(/i);
   assert.match(sql, /st_dwithin\(/i);
+  assert.match(sql, /p\.geog is not null and st_dwithin/i);
 });
 
 test("combined score keeps text relevance ahead of distance and sponsorship", () => {

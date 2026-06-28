@@ -89,6 +89,7 @@ export async function searchSupabasePlaces(input: {
   location?: City | null;
   offset?: number;
   query: string;
+  radiusKm?: number;
   userLocation?: { latitude: number; longitude: number } | null;
 }): Promise<SupabasePlaceSearchResult | null> {
   const searchLocation = input.userLocation ?? input.location ?? null;
@@ -99,6 +100,9 @@ export async function searchSupabasePlaces(input: {
     search_lat: searchLocation?.latitude,
     search_lon: searchLocation?.longitude,
     search_query: input.query,
+    search_radius_meters: input.userLocation
+      ? Math.trunc((input.radiusKm ?? 15) * 1000)
+      : null,
   });
 
   if (!response.ok || !response.data) {

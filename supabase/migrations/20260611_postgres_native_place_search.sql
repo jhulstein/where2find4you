@@ -214,8 +214,7 @@ as $$
       and (
         search_radius_meters is null
         or params.origin is null
-        or p.geog is null
-        or st_dwithin(p.geog, params.origin, search_radius_meters)
+        or (p.geog is not null and st_dwithin(p.geog, params.origin, search_radius_meters))
       )
   ),
   ranked as (
