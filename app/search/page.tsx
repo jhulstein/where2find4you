@@ -15,19 +15,34 @@ type SearchPageProps = {
   searchParams: Promise<{
     q?: string;
     category?: string;
+    lat?: string;
     location?: string;
+    lon?: string;
     sort?: "relevance" | "popularity" | "newest";
   }>;
 };
 
+function parseCoordinate(value: string | undefined) {
+  const coordinate = Number(value);
+
+  return Number.isFinite(coordinate) ? coordinate : null;
+}
+
 export default async function SearchPage({ searchParams }: SearchPageProps) {
   const params = await searchParams;
+  const latitude = parseCoordinate(params.lat);
+  const longitude = parseCoordinate(params.lon);
+  const userLocation =
+    latitude !== null && longitude !== null
+      ? { latitude, longitude }
+      : null;
   const searchResult = await searchPlaces({
     category: params.category,
     limit: 120,
     location: params.location,
     query: params.q,
     sort: params.sort,
+    userLocation,
   });
   const query = searchResult.normalizedQuery;
   const category = searchResult.category;
@@ -51,13 +66,17 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
   const mapPlaces = sorted.slice(0, 20);
   const cityLabel = cityForSearch
     ? `${cityForSearch.name}, ${cityForSearch.country}`
+    : userLocation
+      ? "Near your position"
     : "All pilot cities";
   const activeFilter = searchFilterOptions.find((option) => option.id === category);
   const pageTitle = query
     ? `Results for “${query}”`
     : category === "all"
       ? "Explore places"
-      : `${activeFilter?.label ?? "Places"} in ${cityForSearch?.name ?? "pilot cities"}`;
+      : `${activeFilter?.label ?? "Places"} ${
+          cityForSearch ? `in ${cityForSearch.name}` : userLocation ? "near you" : "in pilot cities"
+        }`;
   const donationUrl = process.env.NEXT_PUBLIC_DONATION_URL ?? "/contact?reason=donation";
   const donationIsExternal = donationUrl.startsWith("http");
 
@@ -69,13 +88,17 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
             category={category}
             defaultValue={query}
             compact
-            location={cityForSearch?.slug ?? params.location}
+            latitude={userLocation?.latitude ?? null}
+            location={userLocation ? undefined : cityForSearch?.slug ?? params.location}
+            longitude={userLocation?.longitude ?? null}
             sort={sort}
           />
           <div className="mt-4 grid gap-3 lg:grid-cols-[1fr_220px_220px]">
             <CategoryFilter
               activeCategory={category}
-              location={cityForSearch?.slug ?? params.location}
+              latitude={userLocation?.latitude ?? null}
+              location={userLocation ? undefined : cityForSearch?.slug ?? params.location}
+              longitude={userLocation?.longitude ?? null}
               query={query}
               sort={sort}
             />
@@ -98,6 +121,11 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
               <input type="hidden" name="category" value={category} />
               {cityForSearch ? (
                 <input type="hidden" name="location" value={cityForSearch.slug} />
+              ) : userLocation ? (
+                <>
+                  <input type="hidden" name="lat" value={String(userLocation.latitude)} />
+                  <input type="hidden" name="lon" value={String(userLocation.longitude)} />
+                </>
               ) : null}
               <select
                 name="sort"
@@ -152,16 +180,20 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
 
         <PlaceMap
           places={mapPlaces}
-          city={cityForSearch ?? undefined}
+          city={userLocation ? undefined : cityForSearch ?? undefined}
+          initialUserLocation={userLocation}
           preferUserLocation
           showLocationControl
           title="Map view"
           subtitle={
             cityForSearch
               ? `Use your position when available, or browse ${cityForSearch.name}. ${mapPlaces.length} places shown.`
+              : userLocation
+                ? `Centered on your position. ${mapPlaces.length} matching places shown.`
               : `Use your position when available. ${mapPlaces.length} matching places shown across pilot cities.`
           }
           heightClassName="h-[420px] sm:h-[520px] lg:h-[620px]"
+          updateSearchOnLocate
         />
 
         <div className="mt-6 mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">

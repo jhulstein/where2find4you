@@ -3,26 +3,37 @@ import { searchFilterOptions, type SearchFilterId } from "@/lib/searchFilters";
 
 type CategoryFilterProps = {
   activeCategory?: SearchFilterId;
+  latitude?: number | null;
   location?: string;
+  longitude?: number | null;
   query?: string;
   sort?: string;
 };
 
 export function CategoryFilter({
   activeCategory = "all",
+  latitude = null,
   location,
+  longitude = null,
   query = "",
   sort = "relevance",
 }: CategoryFilterProps) {
   function hrefFor(categoryId: SearchFilterId) {
     const searchParams = new URLSearchParams();
-    const nextLocation = location ?? (categoryId === "all" ? undefined : "oslo");
+    const hasUserLocation = Number.isFinite(latitude) && Number.isFinite(longitude);
+    const nextLocation = hasUserLocation
+      ? undefined
+      : location ?? (categoryId === "all" ? undefined : "oslo");
 
     if (query) {
       searchParams.set("q", query);
     }
     if (nextLocation) {
       searchParams.set("location", nextLocation);
+    }
+    if (hasUserLocation) {
+      searchParams.set("lat", String(latitude));
+      searchParams.set("lon", String(longitude));
     }
     searchParams.set("category", categoryId);
     searchParams.set("sort", sort);

@@ -11,7 +11,9 @@ type SearchBarProps = {
   category?: string;
   defaultValue?: string;
   compact?: boolean;
+  latitude?: number | null;
   location?: string;
+  longitude?: number | null;
   sort?: string;
 };
 
@@ -19,7 +21,9 @@ export function SearchBar({
   category,
   defaultValue = "",
   compact = false,
+  latitude = null,
   location,
+  longitude = null,
   sort,
 }: SearchBarProps) {
   const router = useRouter();
@@ -34,6 +38,10 @@ export function SearchBar({
     }
     if (location) {
       searchParams.set("location", location);
+    }
+    if (Number.isFinite(latitude) && Number.isFinite(longitude)) {
+      searchParams.set("lat", String(latitude));
+      searchParams.set("lon", String(longitude));
     }
     if (category) {
       searchParams.set("category", category);
@@ -61,6 +69,12 @@ export function SearchBar({
         }`}
       >
         {location ? <input type="hidden" name="location" value={location} /> : null}
+        {Number.isFinite(latitude) && Number.isFinite(longitude) ? (
+          <>
+            <input type="hidden" name="lat" value={String(latitude)} />
+            <input type="hidden" name="lon" value={String(longitude)} />
+          </>
+        ) : null}
         {category ? <input type="hidden" name="category" value={category} /> : null}
         {sort ? <input type="hidden" name="sort" value={sort} /> : null}
         <div className="flex flex-col gap-2 sm:flex-row">

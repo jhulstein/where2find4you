@@ -2,7 +2,7 @@
 
 import L from "leaflet";
 import { LocateFixed } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { MapContainer, Marker, Popup, TileLayer } from "react-leaflet";
 import { useMap } from "react-leaflet";
 import type { PlaceMapProps } from "@/components/PlaceMap";
@@ -50,13 +50,20 @@ function RecenterMap({ center, zoom }: { center: [number, number]; zoom: number 
 
 export default function LeafletMap({
   city,
+  initialUserLocation = null,
   places,
   preferUserLocation = false,
   scores = [],
   showLocationControl = false,
+  updateSearchOnLocate = false,
 }: PlaceMapProps) {
-  const [userPosition, setUserPosition] = useState<[number, number] | null>(null);
-  const [locationState, setLocationState] = useState<LocationState>("idle");
+  const initialPosition = initialUserLocation
+    ? [initialUserLocation.latitude, initialUserLocation.longitude] as [number, number]
+    : null;
+  const [userPosition, setUserPosition] = useState<[number, number] | null>(initialPosition);
+  const [locationState, setLocationState] = useState<LocationState>(
+    initialPosition ? "ready" : "idle",
+  );
   const scoreByPlaceId = scores.reduce<Record<string, number>>(
     (accumulator, score) => {
       accumulator[score.placeId] = score.totalScore;
@@ -68,7 +75,7 @@ export default function LeafletMap({
   const center = userPosition ?? fallbackCenter;
   const zoom = userPosition ? 15 : city && places.length === 0 ? 12 : places.length > 1 ? 13 : 14;
 
-  function requestUserPosition() {
+  const requestUserPosition = useCallback(() => {
     if (!("geolocation" in navigator)) {
       setLocationState("unsupported");
       return;
@@ -77,8 +84,23 @@ export default function LeafletMap({
     setLocationState("locating");
     navigator.geolocation.getCurrentPosition(
       (position) => {
-        setUserPosition([position.coords.latitude, position.coords.longitude]);
+        const nextPosition: [number, number] = [
+          position.coords.latitude,
+          position.coords.longitude,
+        ];
+
+        setUserPosition(nextPosition);
         setLocationState("ready");
+
+        if (updateSearchOnLocate) {
+          const searchParams = new URLSearchParams(window.location.search);
+
+          searchParams.set("lat", nextPosition[0].toFixed(6));
+          searchParams.set("lon", nextPosition[1].toFixed(6));
+          searchParams.delete("location");
+
+          window.location.assign(`/search?${searchParams.toString()}`);
+        }
       },
       (error) => {
         if (error.code === error.PERMISSION_DENIED) {
@@ -93,7 +115,7 @@ export default function LeafletMap({
       },
       { enableHighAccuracy: true, maximumAge: 60000, timeout: 8000 },
     );
-  }
+  }, [updateSearchOnLocate]);
 
   useEffect(() => {
     if (!preferUserLocation || !("permissions" in navigator)) {
@@ -108,7 +130,7 @@ export default function LeafletMap({
         }
       })
       .catch(() => undefined);
-  }, [preferUserLocation]);
+  }, [preferUserLocation, requestUserPosition]);
 
   const markerIcon = L.divIcon({
     className: "",

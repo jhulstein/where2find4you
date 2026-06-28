@@ -125,6 +125,10 @@ function findSearchCity(input: SearchServiceInput, normalizedQuery: string, cate
     return selectedCity;
   }
 
+  if (input.userLocation) {
+    return null;
+  }
+
   return category !== "all" ? cities[0] : null;
 }
 

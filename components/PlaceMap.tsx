@@ -8,10 +8,12 @@ export type PlaceMapProps = {
   city?: City;
   scores?: PlaceScore[];
   heightClassName?: string;
+  initialUserLocation?: { latitude: number; longitude: number } | null;
   preferUserLocation?: boolean;
   showLocationControl?: boolean;
   title?: string;
   subtitle?: string;
+  updateSearchOnLocate?: boolean;
 };
 
 const LeafletMap = dynamic(() => import("@/components/LeafletMap"), {
@@ -28,10 +30,12 @@ export function PlaceMap({
   city,
   scores = [],
   heightClassName = "h-[420px]",
+  initialUserLocation = null,
   preferUserLocation = false,
   showLocationControl = false,
   title,
   subtitle,
+  updateSearchOnLocate = false,
 }: PlaceMapProps) {
   return (
     <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
@@ -46,10 +50,12 @@ export function PlaceMap({
       <div className={heightClassName}>
         <LeafletMap
           city={city}
+          initialUserLocation={initialUserLocation}
           places={places}
           preferUserLocation={preferUserLocation}
           scores={scores}
           showLocationControl={showLocationControl}
+          updateSearchOnLocate={updateSearchOnLocate}
         />
       </div>
     </section>
