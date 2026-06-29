@@ -16,6 +16,7 @@ type OsmSearchInput = {
   detectedCategory: PlaceCategory | null;
   limit?: number;
   query: string;
+  radiusKm?: number | null;
 };
 
 type NormalizedOsmSearchInput = Omit<OsmSearchInput, "city" | "limit"> & {
@@ -27,7 +28,14 @@ const overpassEndpoint = "https://overpass-api.de/api/interpreter";
 const osmSearchTimeoutMs = 5500;
 
 const categorySelectors: Record<PlaceCategory, string[]> = {
-  restaurants: ['amenity="restaurant"'],
+  restaurants: [
+    'amenity="restaurant"',
+    'amenity="cafe"',
+    'amenity="bar"',
+    'amenity="pub"',
+    'amenity="fast_food"',
+    'amenity="food_court"',
+  ],
   cafes: ['amenity="cafe"'],
   hotels: ['tourism="hotel"'],
   attractions: ['tourism="attraction"', 'tourism="viewpoint"'],
@@ -50,6 +58,26 @@ function normalize(value: string) {
 
 function selectorsFor(input: OsmSearchInput) {
   const normalizedQuery = normalize(input.query);
+  const hasRestaurantIntent =
+    input.category === "restaurants" ||
+    [
+      "restaurant",
+      "restaurants",
+      "food",
+      "cafe",
+      "dining",
+      "bar",
+      "bistro",
+      "eatery",
+      "pizza",
+      "sushi",
+      "burger",
+      "lunch",
+      "dinner",
+      "mat",
+      "middag",
+      "kafe",
+    ].some((term) => normalizedQuery.includes(term));
 
   if (input.category === "free-wifi" || normalizedQuery.includes("wifi")) {
     return [
@@ -62,6 +90,10 @@ function selectorsFor(input: OsmSearchInput) {
 
   if (input.category === "rooftops" || normalizedQuery.includes("rooftop")) {
     return ['amenity="bar"', 'amenity="pub"', 'tourism="viewpoint"'];
+  }
+
+  if (hasRestaurantIntent) {
+    return categorySelectors.restaurants;
   }
 
   if (input.category !== "all") {
@@ -92,6 +124,7 @@ function selectorsFor(input: OsmSearchInput) {
 function categoryFor(tags: Record<string, string>, fallback: SearchFilterId): PlaceCategory {
   if (tags.amenity === "restaurant") return "restaurants";
   if (tags.amenity === "cafe") return "cafes";
+  if (tags.amenity === "fast_food" || tags.amenity === "food_court") return "restaurants";
   if (tags.tourism === "hotel") return "hotels";
   if (tags.leisure === "marina") return "marinas";
   if (tags.amenity === "bar" || tags.amenity === "pub") return "bars";
@@ -149,7 +182,11 @@ function selectorQuery(selector: string, radiusMeters: number, city: City) {
 
 function buildQuery(input: NormalizedOsmSearchInput) {
   const selectors = selectorsFor(input).slice(0, 8);
-  const radiusMeters = input.category === "all" ? 3500 : 5500;
+  const radiusMeters = input.radiusKm
+    ? Math.trunc(Math.max(1, Math.min(input.radiusKm, 100)) * 1000)
+    : input.category === "all"
+      ? 3500
+      : 5500;
   const body = selectors
     .map((selector) => selectorQuery(selector, radiusMeters, input.city))
     .join("");

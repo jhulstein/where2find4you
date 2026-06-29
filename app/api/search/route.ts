@@ -15,9 +15,15 @@ export async function GET(request: Request) {
   const offsetParam = searchParams.get("offset");
   const limit = limitParam === null ? Number.NaN : Number(limitParam);
   const offset = offsetParam === null ? Number.NaN : Number(offsetParam);
+  const filters = [
+    ...searchParams.getAll("filter"),
+    ...searchParams.getAll("filters"),
+    searchParams.has("free_wifi") ? "free_wifi" : null,
+  ].filter((filter): filter is string => Boolean(filter));
   const searchResult = await searchPlaces({
     category: searchParams.get("category"),
     debug: searchParams.get("debug") === "1",
+    filters,
     limit: Number.isFinite(limit) ? limit : 100,
     location: searchParams.get("location"),
     offset: Number.isFinite(offset) ? offset : 0,

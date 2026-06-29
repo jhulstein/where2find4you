@@ -189,6 +189,21 @@ function searchCategoriesFor(category: SearchFilterId) {
   return category === "restaurants" ? restaurantSearchCategories : [category];
 }
 
+function cityFromUserLocation(userLocation: SearchCoordinates | null | undefined): City | null {
+  if (!userLocation) {
+    return null;
+  }
+
+  return {
+    id: "near-me",
+    name: "Nearby",
+    slug: "near-me",
+    country: "",
+    latitude: userLocation.latitude,
+    longitude: userLocation.longitude,
+  };
+}
+
 function osmCategoriesFor(category: SearchFilterId, filters: SearchAmenityFilterId[]) {
   const categories = searchCategoriesFor(category);
 
@@ -285,9 +300,10 @@ async function searchFallbackPlaces(input: SearchServiceInput & {
     ...databaseSearches.map((result) => result.places),
   );
   const usesDatabase = databaseSearches.length > 0;
+  const osmSearchCity = city ?? cityFromUserLocation(input.userLocation);
   const shouldFetchOsmPlaces =
     input.includeOsmFallback !== false &&
-    Boolean(city && (normalizedQuery || category !== "all" || filters.length > 0)) &&
+    Boolean(osmSearchCity && (normalizedQuery || category !== "all" || filters.length > 0)) &&
     (!usesDatabase || databasePlaces.length < Math.max(8, pageSize));
   const osmPlaces = shouldFetchOsmPlaces
     ? mergePlaces(
@@ -295,10 +311,11 @@ async function searchFallbackPlaces(input: SearchServiceInput & {
           osmCategoriesFor(category, filters).map((osmCategory) =>
             searchOsmPlaces({
               category: osmCategory,
-              city,
+              city: osmSearchCity,
               detectedCategory: intent.detectedCategory,
               limit: Math.max(36, pageSize),
               query: normalizedQuery,
+              radiusKm: city ? undefined : radiusKm,
             }),
           ),
         )),

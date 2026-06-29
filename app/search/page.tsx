@@ -100,7 +100,14 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
     places: sorted.map((place) => ({ id: place.id, isSponsored: place.isSponsored })),
     searchId: searchRecord.id,
   });
-  const mapPlaces = sorted.slice(0, 20);
+  const mapPlaces = sorted
+    .filter(
+      (place) =>
+        Number.isFinite(place.latitude) &&
+        Number.isFinite(place.longitude) &&
+        (place.latitude !== 0 || place.longitude !== 0),
+    )
+    .slice(0, 100);
   const cityLabel = cityForSearch
     ? `${cityForSearch.name}, ${cityForSearch.country}`
     : activeUserLocation
@@ -217,7 +224,7 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
             <p className="mt-1 text-sm text-slate-600">
               City: <span className="font-semibold text-slate-800">{cityLabel}</span>.
               {" "}
-              {searchResult.totalCount} matching places. Sponsored listings are clearly marked.
+              {searchResult.totalCount} matching places. {mapPlaces.length} shown on map.
             </p>
           </div>
           <a
@@ -240,10 +247,10 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
           title="Map view"
           subtitle={
             cityForSearch
-              ? `Use your position when available, or browse ${cityForSearch.name}. ${mapPlaces.length} places shown.`
+              ? `Use your position when available, or browse ${cityForSearch.name}. ${mapPlaces.length} shown on map.`
               : userLocation
-                ? `Centered on your position. ${mapPlaces.length} matching places shown.`
-              : `Use your position when available. ${mapPlaces.length} matching places shown across pilot cities.`
+                ? `Centered on your position. ${mapPlaces.length} shown on map.`
+              : `Use your position when available. ${mapPlaces.length} shown on map across pilot cities.`
           }
           heightClassName="h-[420px] sm:h-[520px] lg:h-[620px]"
           updateSearchOnLocate
