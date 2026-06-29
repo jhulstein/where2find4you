@@ -5,6 +5,7 @@ import { searchOsmPlaces } from "@/lib/search/osmPlaces";
 import {
   DEFAULT_SEARCH_RADIUS_KM,
   detectSearchIntent,
+  matchesSearchIntent,
   normalizeQuery,
   searchPlaceRecords,
 } from "@/lib/search/ranking";
@@ -20,6 +21,7 @@ import { searchSupabasePlaces } from "@/lib/supabase/search";
 import type { City, Place, PlaceCategory } from "@/lib/types";
 
 export type SearchSort = "relevance" | "popularity" | "newest";
+export type SearchAmenityFilterId = "free_wifi";
 
 export type SearchCoordinates = {
   latitude: number;
@@ -29,6 +31,7 @@ export type SearchCoordinates = {
 export type SearchServiceInput = {
   category?: string | null;
   debug?: boolean;
+  filters?: string | string[] | null;
   includeOsmFallback?: boolean;
   limit?: number;
   location?: string | null;
@@ -46,6 +49,7 @@ export type SearchServiceResult = {
   city: City | null;
   detectedCategory: PlaceCategory | null;
   detectedLocation: string | null;
+  filters: SearchAmenityFilterId[];
   filtersUsed: Record<string, string | number | boolean | null>;
   normalizedQuery: string;
   offset: number;
@@ -96,14 +100,49 @@ function normalizeSort(value: SearchServiceInput["sort"]): SearchSort {
   return value === "popularity" || value === "newest" ? value : "relevance";
 }
 
-function pageSizeFor(input: SearchServiceInput) {
-  const requested = input.pageSize ?? input.limit ?? 80;
+function normalizeCategory(value: SearchServiceInput["category"]): SearchFilterId {
+  const normalized = normalizeQuery(value ?? "").replaceAll(" ", "-").replaceAll("_", "-");
 
-  if (!Number.isFinite(requested)) {
-    return 80;
+  if (normalized === "restaurant" || normalized === "restaurants") {
+    return "restaurants";
   }
 
-  return Math.max(1, Math.min(Math.trunc(requested), 150));
+  if (normalized === "free-wifi" || normalized === "freewifi") {
+    return "all";
+  }
+
+  return normalizeSearchFilter(value ?? undefined);
+}
+
+function normalizeFilters(
+  filters: SearchServiceInput["filters"],
+  category: SearchServiceInput["category"],
+): SearchAmenityFilterId[] {
+  const rawFilters = Array.isArray(filters) ? filters : filters ? [filters] : [];
+  const categoryFilter = normalizeQuery(category ?? "").replaceAll(" ", "_").replaceAll("-", "_");
+
+  if (categoryFilter === "free_wifi" || categoryFilter === "freewifi") {
+    rawFilters.push("free_wifi");
+  }
+
+  return Array.from(
+    new Set(
+      rawFilters
+        .flatMap((filter) => filter.split(","))
+        .map((filter) => filter.trim().toLowerCase().replaceAll("-", "_"))
+        .filter((filter): filter is SearchAmenityFilterId => filter === "free_wifi"),
+    ),
+  );
+}
+
+function pageSizeFor(input: SearchServiceInput) {
+  const requested = input.pageSize ?? input.limit ?? 100;
+
+  if (!Number.isFinite(requested)) {
+    return 100;
+  }
+
+  return Math.max(1, Math.min(Math.trunc(requested), 250));
 }
 
 function offsetFor(input: SearchServiceInput, pageSize: number) {
@@ -144,9 +183,40 @@ function findSearchCity(input: SearchServiceInput, normalizedQuery: string, cate
   return category !== "all" ? cities[0] : null;
 }
 
+const restaurantSearchCategories: SearchFilterId[] = ["restaurants", "cafes", "bars"];
+
+function searchCategoriesFor(category: SearchFilterId) {
+  return category === "restaurants" ? restaurantSearchCategories : [category];
+}
+
+function osmCategoriesFor(category: SearchFilterId, filters: SearchAmenityFilterId[]) {
+  const categories = searchCategoriesFor(category);
+
+  if (filters.includes("free_wifi")) {
+    return Array.from(new Set([...categories, "free-wifi" as SearchFilterId]));
+  }
+
+  return categories;
+}
+
+function placeMatchesAdditionalFilters(place: Place, filters: SearchAmenityFilterId[]) {
+  if (filters.length === 0) {
+    return true;
+  }
+
+  return filters.every((filter) => {
+    if (filter === "free_wifi") {
+      return matchesSearchIntent(place, "free-wifi") || matchesSearchIntent(place, "wifi");
+    }
+
+    return true;
+  });
+}
+
 async function searchFallbackPlaces(input: SearchServiceInput & {
   category: SearchFilterId;
   city: City | null;
+  filters: SearchAmenityFilterId[];
   normalizedQuery: string;
   offset: number;
   page: number;
@@ -157,6 +227,7 @@ async function searchFallbackPlaces(input: SearchServiceInput & {
   const {
     category,
     city,
+    filters,
     normalizedQuery,
     offset,
     page,
@@ -165,51 +236,49 @@ async function searchFallbackPlaces(input: SearchServiceInput & {
     sort,
   } = input;
   const intent = detectSearchIntent(normalizedQuery);
-  const candidateLimit = Math.max(80, Math.min(pageSize + offset + 80, 180));
-  const databaseRequests = [
-    searchSupabasePlaces({
-      category,
-      limit: candidateLimit,
-      location: city,
-      offset: 0,
-      query: normalizedQuery,
-      radiusKm,
-      userLocation: input.userLocation,
-    }),
-  ];
+  const candidateLimit = Math.max(100, Math.min(pageSize + offset + 150, 250));
+  const databaseRequests = new Map<string, ReturnType<typeof searchSupabasePlaces>>();
+  const addDatabaseRequest = (searchCategory: SearchFilterId, query: string) => {
+    const key = `${searchCategory}:${query}`;
+
+    if (databaseRequests.has(key)) {
+      return;
+    }
+
+    databaseRequests.set(
+      key,
+      searchSupabasePlaces({
+        category: searchCategory,
+        limit: candidateLimit,
+        location: city,
+        offset: 0,
+        query,
+        radiusKm,
+        userLocation: input.userLocation,
+      }),
+    );
+  };
+
+  for (const searchCategory of searchCategoriesFor(category)) {
+    addDatabaseRequest(searchCategory, normalizedQuery);
+  }
+
+  if (filters.includes("free_wifi")) {
+    addDatabaseRequest("free-wifi", "wifi");
+  }
 
   if (
     intent.detectedCategory &&
     (category === "all" || category === intent.detectedCategory)
   ) {
-    databaseRequests.push(
-      searchSupabasePlaces({
-        category: intent.detectedCategory,
-        limit: candidateLimit,
-        location: city,
-        offset: 0,
-        query: "",
-        radiusKm,
-        userLocation: input.userLocation,
-      }),
-    );
+    addDatabaseRequest(intent.detectedCategory, "");
   }
 
   if (intent.hasWifiIntent || intent.hasFreeWifiIntent || category === "free-wifi") {
-    databaseRequests.push(
-      searchSupabasePlaces({
-        category: "free-wifi",
-        limit: candidateLimit,
-        location: city,
-        offset: 0,
-        query: "wifi",
-        radiusKm,
-        userLocation: input.userLocation,
-      }),
-    );
+    addDatabaseRequest("free-wifi", "wifi");
   }
 
-  const databaseSearches = (await Promise.all(databaseRequests)).filter(
+  const databaseSearches = (await Promise.all(databaseRequests.values())).filter(
     (result): result is NonNullable<typeof result> => result !== null,
   );
   const databasePlaces = mergePlaces(
@@ -218,19 +287,27 @@ async function searchFallbackPlaces(input: SearchServiceInput & {
   const usesDatabase = databaseSearches.length > 0;
   const shouldFetchOsmPlaces =
     input.includeOsmFallback !== false &&
-    Boolean(city && (normalizedQuery || category !== "all")) &&
+    Boolean(city && (normalizedQuery || category !== "all" || filters.length > 0)) &&
     (!usesDatabase || databasePlaces.length < Math.max(8, pageSize));
   const osmPlaces = shouldFetchOsmPlaces
-    ? await searchOsmPlaces({
-        category,
-        city,
-        detectedCategory: intent.detectedCategory,
-        limit: Math.max(36, pageSize),
-        query: normalizedQuery,
-      })
+    ? mergePlaces(
+        ...(await Promise.all(
+          osmCategoriesFor(category, filters).map((osmCategory) =>
+            searchOsmPlaces({
+              category: osmCategory,
+              city,
+              detectedCategory: intent.detectedCategory,
+              limit: Math.max(36, pageSize),
+              query: normalizedQuery,
+            }),
+          ),
+        )),
+      )
     : [];
   const sourcePlaces = usesDatabase ? databasePlaces : activePlaces;
-  const candidates = mergePlaces(sourcePlaces, osmPlaces);
+  const candidates = mergePlaces(sourcePlaces, osmPlaces).filter((place) =>
+    placeMatchesAdditionalFilters(place, filters),
+  );
   const search = searchPlaceRecords(candidates, {
     category,
     getPopularityScore: (place) => getPlaceAnalytics(place).impressions,
@@ -255,8 +332,10 @@ async function searchFallbackPlaces(input: SearchServiceInput & {
     city,
     detectedCategory: intent.detectedCategory,
     detectedLocation: city?.slug ?? null,
+    filters,
     filtersUsed: {
       category,
+      filters: filters.join(",") || null,
       location: city?.slug ?? input.location ?? null,
       offset,
       page,
@@ -282,7 +361,8 @@ export async function searchPlaces(input: SearchServiceInput = {}): Promise<Sear
   const rawQuery = input.query?.trim() ?? "";
   const normalizedQuery = normalizeQuery(rawQuery);
   const intent = detectSearchIntent(normalizedQuery);
-  const category = normalizeSearchFilter(input.category ?? undefined);
+  const category = normalizeCategory(input.category ?? undefined);
+  const filters = normalizeFilters(input.filters, input.category ?? undefined);
   const sort = normalizeSort(input.sort);
   const city = findSearchCity(input, normalizedQuery, category);
   const effectiveUserLocation = city ? null : input.userLocation;
@@ -290,19 +370,22 @@ export async function searchPlaces(input: SearchServiceInput = {}): Promise<Sear
   const offset = offsetFor(input, pageSize);
   const page = Math.floor(offset / pageSize) + 1;
   const radiusKm = radiusFor(input);
-  const typesenseSearch = await searchTypesensePlaces({
-    category,
-    debug: input.debug,
-    limit: pageSize,
-    location: city,
-    offset,
-    page,
-    pageSize,
-    query: normalizedQuery,
-    radiusKm,
-    sort,
-    userLocation: effectiveUserLocation,
-  });
+  const canUseTypesense = category !== "restaurants" && filters.length === 0;
+  const typesenseSearch = canUseTypesense
+    ? await searchTypesensePlaces({
+        category,
+        debug: input.debug,
+        limit: pageSize,
+        location: city,
+        offset,
+        page,
+        pageSize,
+        query: normalizedQuery,
+        radiusKm,
+        sort,
+        userLocation: effectiveUserLocation,
+      })
+    : null;
 
   if (typesenseSearch) {
     return {
@@ -311,8 +394,10 @@ export async function searchPlaces(input: SearchServiceInput = {}): Promise<Sear
       debug: typesenseSearch.debug,
       detectedCategory: intent.detectedCategory,
       detectedLocation: city?.slug ?? null,
+      filters,
       filtersUsed: {
         category,
+        filters: filters.join(",") || null,
         location: city?.slug ?? input.location ?? null,
         offset,
         page,
@@ -338,6 +423,7 @@ export async function searchPlaces(input: SearchServiceInput = {}): Promise<Sear
     ...input,
     category,
     city,
+    filters,
     normalizedQuery,
     offset,
     page,

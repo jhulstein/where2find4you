@@ -3,30 +3,37 @@ import { searchFilterOptions, type SearchFilterId } from "@/lib/searchFilters";
 
 type CategoryFilterProps = {
   activeCategory?: SearchFilterId;
+  activeFilters?: string[];
   latitude?: number | null;
   location?: string;
   longitude?: number | null;
-  query?: string;
   sort?: string;
 };
 
 export function CategoryFilter({
   activeCategory = "all",
+  activeFilters = [],
   latitude = null,
   location,
   longitude = null,
-  query = "",
   sort = "relevance",
 }: CategoryFilterProps) {
-  function hrefFor(categoryId: SearchFilterId) {
+  function hrefFor(optionId: SearchFilterId) {
     const searchParams = new URLSearchParams();
     const hasUserLocation = Number.isFinite(latitude) && Number.isFinite(longitude);
+    const isFreeWifiFilter = optionId === "free-wifi";
+    const categoryId = isFreeWifiFilter ? activeCategory : optionId;
     const nextLocation = hasUserLocation
       ? undefined
       : location ?? (categoryId === "all" ? undefined : "oslo");
+    const nextFilters = new Set(activeFilters);
 
-    if (query) {
-      searchParams.set("q", query);
+    if (isFreeWifiFilter) {
+      if (nextFilters.has("free_wifi")) {
+        nextFilters.delete("free_wifi");
+      } else {
+        nextFilters.add("free_wifi");
+      }
     }
     if (nextLocation) {
       searchParams.set("location", nextLocation);
@@ -36,6 +43,9 @@ export function CategoryFilter({
       searchParams.set("lon", String(longitude));
     }
     searchParams.set("category", categoryId);
+    for (const filter of nextFilters) {
+      searchParams.append("filter", filter);
+    }
     searchParams.set("sort", sort);
 
     return `/search?${searchParams.toString()}`;
@@ -45,7 +55,10 @@ export function CategoryFilter({
     <div className="flex gap-2 overflow-x-auto pb-2">
       {searchFilterOptions.map((category) => {
         const href = hrefFor(category.id);
-        const isActive = activeCategory === category.id;
+        const isActive =
+          category.id === "free-wifi"
+            ? activeFilters.includes("free_wifi")
+            : activeCategory === category.id;
 
         return (
           <Link

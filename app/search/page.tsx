@@ -13,45 +13,81 @@ import { createSearchRecord, logImpressions } from "@/lib/tracking";
 
 type SearchPageProps = {
   searchParams: Promise<{
-    q?: string;
-    category?: string;
-    lat?: string;
-    location?: string;
-    lon?: string;
+    filter?: string | string[];
+    filters?: string | string[];
+    free_wifi?: string;
+    q?: string | string[];
+    category?: string | string[];
+    lat?: string | string[];
+    location?: string | string[];
+    lon?: string | string[];
     sort?: "relevance" | "popularity" | "newest";
   }>;
 };
 
-function parseCoordinate(value: string | undefined) {
-  const coordinate = Number(value);
+function firstParam(value: string | string[] | undefined) {
+  return Array.isArray(value) ? value[0] : value;
+}
+
+function paramValues(value: string | string[] | undefined) {
+  return Array.isArray(value) ? value : value ? [value] : [];
+}
+
+function parseCoordinate(value: string | string[] | undefined) {
+  const coordinate = Number(firstParam(value));
 
   return Number.isFinite(coordinate) ? coordinate : null;
 }
 
+function searchFiltersFromParams(params: Awaited<SearchPageProps["searchParams"]>) {
+  const filters = [
+    ...paramValues(params.filter),
+    ...paramValues(params.filters),
+    params.free_wifi ? "free_wifi" : null,
+  ];
+
+  return Array.from(
+    new Set(
+      filters
+        .filter((filter): filter is string => Boolean(filter))
+        .flatMap((filter) => filter.split(","))
+        .map((filter) => filter.trim().toLowerCase().replaceAll("-", "_"))
+        .filter((filter) => filter === "free_wifi"),
+    ),
+  );
+}
+
 export default async function SearchPage({ searchParams }: SearchPageProps) {
   const params = await searchParams;
+  const rawQuery = firstParam(params.q) ?? "";
+  const requestedCategory = firstParam(params.category);
+  const requestedLocation = firstParam(params.location);
+  const requestedSort = firstParam(params.sort);
+  const activeFilters = searchFiltersFromParams(params);
   const latitude = parseCoordinate(params.lat);
   const longitude = parseCoordinate(params.lon);
   const userLocation =
-    !params.location && latitude !== null && longitude !== null
+    !requestedLocation && latitude !== null && longitude !== null
       ? { latitude, longitude }
       : null;
   const searchResult = await searchPlaces({
-    category: params.category,
-    limit: 120,
-    location: params.location,
-    query: params.q,
-    sort: params.sort,
+    category: requestedCategory,
+    filters: activeFilters,
+    limit: 100,
+    location: requestedLocation,
+    query: rawQuery,
+    sort: requestedSort,
     userLocation,
   });
   const query = searchResult.normalizedQuery;
   const category = searchResult.category;
+  const filters = searchResult.filters;
   const sort = searchResult.sort;
   const cityForSearch = searchResult.city;
   const activeUserLocation = searchResult.userLocationAvailable ? userLocation : null;
   const sorted = searchResult.results;
   const searchRecord = await createSearchRecord({
-    query: params.q?.trim() || "all places",
+    query: rawQuery.trim() || "all places",
     normalizedQuery: query,
     detectedCategory: searchResult.detectedCategory,
     detectedLocation: searchResult.detectedLocation,
@@ -80,6 +116,22 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
         }`;
   const donationUrl = process.env.NEXT_PUBLIC_DONATION_URL ?? "/contact?reason=donation";
   const donationIsExternal = donationUrl.startsWith("http");
+  const filterHiddenInputs = (prefix: string) =>
+    filters.map((filter) => (
+      <input key={`${prefix}-${filter}`} type="hidden" name="filter" value={filter} />
+    ));
+  const cityHref = (citySlug: string) => {
+    const citySearchParams = new URLSearchParams();
+
+    citySearchParams.set("location", citySlug);
+    citySearchParams.set("category", category);
+    for (const filter of filters) {
+      citySearchParams.append("filter", filter);
+    }
+    citySearchParams.set("sort", sort);
+
+    return `/search?${citySearchParams.toString()}`;
+  };
 
   return (
     <main>
@@ -90,26 +142,26 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
             defaultValue={query}
             compact
             latitude={activeUserLocation?.latitude ?? null}
-            location={activeUserLocation ? undefined : cityForSearch?.slug ?? params.location}
+            location={activeUserLocation ? undefined : cityForSearch?.slug ?? requestedLocation}
             longitude={activeUserLocation?.longitude ?? null}
             sort={sort}
           />
           <div className="mt-4 grid gap-3 lg:grid-cols-[1fr_220px_220px]">
             <CategoryFilter
               activeCategory={category}
+              activeFilters={filters}
               latitude={activeUserLocation?.latitude ?? null}
-              location={activeUserLocation ? undefined : cityForSearch?.slug ?? params.location}
+              location={activeUserLocation ? undefined : cityForSearch?.slug ?? requestedLocation}
               longitude={activeUserLocation?.longitude ?? null}
-              query={query}
               sort={sort}
             />
             <form action="/search" className="flex gap-2">
-              <input type="hidden" name="q" value={query} />
               <input type="hidden" name="category" value={category} />
+              {filterHiddenInputs("location")}
               <input type="hidden" name="sort" value={sort} />
               <input
                 name="location"
-                defaultValue={cityForSearch?.name ?? params.location}
+                defaultValue={cityForSearch?.name ?? requestedLocation}
                 placeholder="City"
                 className="h-11 min-w-0 flex-1 rounded-lg border border-slate-200 px-3 text-sm outline-none focus:border-teal-600 focus:ring-4 focus:ring-teal-100"
               />
@@ -118,8 +170,8 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
               </button>
             </form>
             <form action="/search">
-              <input type="hidden" name="q" value={query} />
               <input type="hidden" name="category" value={category} />
+              {filterHiddenInputs("sort")}
               {cityForSearch ? (
                 <input type="hidden" name="location" value={cityForSearch.slug} />
               ) : activeUserLocation ? (
@@ -143,7 +195,7 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
             {cities.slice(0, 6).map((city) => (
               <Link
                 key={city.id}
-                href={`/search?q=${encodeURIComponent(query || `things to do in ${city.name}`)}&location=${city.slug}&category=${category}&sort=${sort}`}
+                href={cityHref(city.slug)}
                 className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm font-medium transition ${
                   cityForSearch?.id === city.id
                     ? "border-teal-700 bg-teal-700 text-white"
