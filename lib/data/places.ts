@@ -64,7 +64,7 @@ export const categoryOptions: Array<{
   },
 ];
 
-export const samplePlaces: Place[] = [
+const rawSamplePlaces: Place[] = [
   {
     id: "pl-waterfront-table",
     name: "Waterfront Table",
@@ -655,11 +655,25 @@ export const samplePlaces: Place[] = [
   },
 ];
 
+function normalizeDemoPlace(place: Place): Place {
+  if (place.source !== "seed") {
+    return place;
+  }
+
+  return {
+    ...place,
+    isSponsored: false,
+    sponsoredPriority: 0,
+  };
+}
+
+export const samplePlaces = rawSamplePlaces.map(normalizeDemoPlace);
+
 export const activePlaces = samplePlaces.filter((place) => place.isActive);
 export const sponsoredPlaces = activePlaces
   .filter((place) => place.isSponsored)
   .sort((a, b) => b.sponsoredPriority - a.sponsoredPriority);
-export const featuredPlaces = sponsoredPlaces.slice(0, 6);
+export const featuredPlaces = activePlaces.slice(0, 6);
 
 export function getPlaceBySlug(slug: string) {
   return samplePlaces.find((place) => place.slug === slug || place.id === slug);

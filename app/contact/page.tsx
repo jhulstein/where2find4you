@@ -13,7 +13,7 @@ export default function ContactPage() {
             </h1>
             <p className="mt-5 text-lg leading-8 text-slate-700">
               Use this placeholder form for pilot destinations, business
-              inquiries, sponsored listing requests and partnership ideas.
+              inquiries, listing improvements and partnership ideas.
             </p>
             <div className="mt-6 space-y-3 text-sm text-slate-600">
               <p className="flex items-center gap-2">

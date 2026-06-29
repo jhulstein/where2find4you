@@ -2,7 +2,6 @@ import {
   ArrowUpRight,
   Globe2,
   MapPin,
-  MousePointerClick,
   Phone,
   Star,
 } from "lucide-react";
@@ -155,13 +154,6 @@ export function PlaceCard({
           <MapPin aria-hidden="true" size={16} />
         </TrackingLink>
       </div>
-
-      {place.isSponsored ? (
-        <p className="mt-3 flex items-center gap-1 text-xs text-slate-500">
-          <MousePointerClick aria-hidden="true" size={13} />
-          Sponsored performance is tracked separately from organic discovery.
-        </p>
-      ) : null}
     </article>
   );
 }

@@ -187,8 +187,8 @@ export default async function PlacePage({ params }: PlacePageProps) {
               <Megaphone aria-hidden="true" size={24} className="text-teal-300" />
               <h2 className="mt-3 font-semibold">Visibility opportunity</h2>
               <p className="mt-2 text-sm leading-6 text-slate-300">
-                Places with strong views and clicks can be offered sponsored
-                placement, enhanced profiles and lead generation.
+                Places with strong views and clicks can be offered enhanced
+                profiles, lead generation and better visibility tools.
               </p>
             </div>
           </aside>

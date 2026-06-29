@@ -25,7 +25,7 @@ type NormalizedOsmSearchInput = Omit<OsmSearchInput, "city" | "limit"> & {
 };
 
 const overpassEndpoint = "https://overpass-api.de/api/interpreter";
-const osmSearchTimeoutMs = 5500;
+const osmSearchTimeoutMs = 12000;
 
 const categorySelectors: Record<PlaceCategory, string[]> = {
   restaurants: [
@@ -180,8 +180,11 @@ function selectorQuery(selector: string, radiusMeters: number, city: City) {
   ].join("");
 }
 
-function buildQuery(input: NormalizedOsmSearchInput) {
-  const selectors = selectorsFor(input).slice(0, 8);
+function buildSelectorQuery(
+  input: NormalizedOsmSearchInput,
+  selectors: string[],
+  limit: number,
+) {
   const radiusMeters = input.radiusKm
     ? Math.trunc(Math.max(1, Math.min(input.radiusKm, 100)) * 1000)
     : input.category === "all"
@@ -191,7 +194,7 @@ function buildQuery(input: NormalizedOsmSearchInput) {
     .map((selector) => selectorQuery(selector, radiusMeters, input.city))
     .join("");
 
-  return `[out:json][timeout:6];(${body});out center ${input.limit};`;
+  return `[out:json][timeout:14];(${body});out center ${limit};`;
 }
 
 function toPlace(element: OsmElement, input: NormalizedOsmSearchInput): Place | null {
@@ -258,43 +261,69 @@ export async function searchOsmPlaces(input: OsmSearchInput): Promise<Place[]> {
     city: input.city,
     limit: input.limit ?? 28,
   };
-  const query = buildQuery(normalizedInput);
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), osmSearchTimeoutMs);
+  const selectors = selectorsFor(normalizedInput).slice(0, 8);
 
-  try {
-    const response = await fetch(overpassEndpoint, {
-      body: new URLSearchParams({ data: query }),
-      headers: { "content-type": "application/x-www-form-urlencoded" },
-      method: "POST",
-      next: { revalidate: 3600 },
-      signal: controller.signal,
-    });
+  async function fetchElements(query: string) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), osmSearchTimeoutMs);
 
-    if (!response.ok) {
+    try {
+      const response = await fetch(overpassEndpoint, {
+        body: new URLSearchParams({ data: query }),
+        headers: {
+          accept: "application/json",
+          "content-type": "application/x-www-form-urlencoded",
+          "user-agent": "where2find4you-web/1.0",
+        },
+        method: "POST",
+        next: { revalidate: 3600 },
+        signal: controller.signal,
+      });
+
+      if (!response.ok) {
+        return [];
+      }
+
+      const data = (await response.json()) as { elements?: OsmElement[] };
+      return data.elements ?? [];
+    } catch {
       return [];
+    } finally {
+      clearTimeout(timeout);
     }
-
-    const data = (await response.json()) as { elements?: OsmElement[] };
-    const seen = new Set<string>();
-
-    return (data.elements ?? [])
-      .map((element) => toPlace(element, normalizedInput))
-      .filter((place): place is Place => Boolean(place))
-      .filter((place) => {
-        const key = `${place.name.toLowerCase()}-${place.latitude.toFixed(5)}-${place.longitude.toFixed(5)}`;
-
-        if (seen.has(key)) {
-          return false;
-        }
-
-        seen.add(key);
-        return true;
-      })
-      .slice(0, normalizedInput.limit);
-  } catch {
-    return [];
-  } finally {
-    clearTimeout(timeout);
   }
+
+  const combinedQuery = buildSelectorQuery(normalizedInput, selectors, normalizedInput.limit);
+  let elements = await fetchElements(combinedQuery);
+
+  if (elements.length === 0 && selectors.length > 1) {
+    const perSelectorLimit = Math.max(
+      20,
+      Math.ceil(normalizedInput.limit / Math.min(selectors.length, 6)),
+    );
+    const splitElements = await Promise.all(
+      selectors.slice(0, 6).map((selector) =>
+        fetchElements(buildSelectorQuery(normalizedInput, [selector], perSelectorLimit)),
+      ),
+    );
+
+    elements = splitElements.flat();
+  }
+
+  const seen = new Set<string>();
+
+  return elements
+    .map((element) => toPlace(element, normalizedInput))
+    .filter((place): place is Place => Boolean(place))
+    .filter((place) => {
+      const key = `${place.name.toLowerCase()}-${place.latitude.toFixed(5)}-${place.longitude.toFixed(5)}`;
+
+      if (seen.has(key)) {
+        return false;
+      }
+
+      seen.add(key);
+      return true;
+    })
+    .slice(0, normalizedInput.limit);
 }

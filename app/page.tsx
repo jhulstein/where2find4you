@@ -162,7 +162,7 @@ export default function Home() {
             <div>
               <p className="text-sm font-semibold text-teal-800">Featured places</p>
               <h2 className="mt-1 text-2xl font-semibold text-slate-950 sm:text-3xl">
-                Sponsored and high-intent listings.
+                Useful places to start.
               </h2>
             </div>
             <Link
@@ -188,7 +188,7 @@ export default function Home() {
             </h2>
             <p className="mt-3 text-sm leading-7 text-slate-600">
               Run the pilot for a destination, measure demand, then contact
-              high-performing places with sponsored placement or enhanced profiles.
+              high-performing places with visibility tools and enhanced profiles.
             </p>
           </div>
           <BusinessCTA />

@@ -114,11 +114,12 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
       ? "Near your position"
     : "All pilot cities";
   const activeFilter = searchFilterOptions.find((option) => option.id === category);
+  const categoryLabel = category === "restaurants" ? "Food & drink" : activeFilter?.label ?? "Places";
   const pageTitle = query
     ? `Results for “${query}”`
     : category === "all"
       ? "Explore places"
-      : `${activeFilter?.label ?? "Places"} ${
+      : `${categoryLabel} ${
           cityForSearch ? `in ${cityForSearch.name}` : activeUserLocation ? "near you" : "in pilot cities"
         }`;
   const donationUrl = process.env.NEXT_PUBLIC_DONATION_URL ?? "/contact?reason=donation";

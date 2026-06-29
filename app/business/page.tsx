@@ -16,8 +16,8 @@ export default function BusinessPage() {
     },
     {
       icon: Megaphone,
-      title: "Sponsored placement",
-      text: "Promote your place in relevant search results without making discovery feel spammy.",
+      title: "Visibility tools",
+      text: "Improve how your place appears in relevant discovery moments without making search feel spammy.",
     },
     {
       icon: UserRoundCheck,
