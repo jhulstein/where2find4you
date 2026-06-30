@@ -9,7 +9,6 @@ const links = [
   { href: "/business", label: "For businesses" },
   { href: "/about", label: "About" },
   { href: "/contact", label: "Contact" },
-  { href: "/admin", label: "Admin" },
 ];
 
 export function MobileMenu() {

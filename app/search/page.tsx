@@ -1,12 +1,13 @@
-import Link from "next/link";
-import { HeartHandshake, MapPin, SlidersHorizontal } from "lucide-react";
+import { HeartHandshake, SlidersHorizontal } from "lucide-react";
 import { CategoryFilter } from "@/components/CategoryFilter";
+import { CityPicker } from "@/components/CityPicker";
 import { PlaceCard } from "@/components/PlaceCard";
 import { PlaceMap } from "@/components/PlaceMap";
 import { ResponsiveContainer } from "@/components/ResponsiveContainer";
 import { SearchBar } from "@/components/SearchBar";
+import { SearchSortSelect } from "@/components/SearchSortSelect";
 import { getPlaceAnalytics } from "@/lib/analytics";
-import { cities } from "@/lib/data/cities";
+import { cities, popularCities } from "@/lib/data/cities";
 import { searchPlaces } from "@/lib/search/searchService";
 import { searchFilterOptions } from "@/lib/searchFilters";
 import { createSearchRecord, logImpressions } from "@/lib/tracking";
@@ -122,24 +123,11 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
       : `${categoryLabel} ${
           cityForSearch ? `in ${cityForSearch.name}` : activeUserLocation ? "near you" : "in pilot cities"
         }`;
-  const donationUrl = process.env.NEXT_PUBLIC_DONATION_URL ?? "/contact?reason=donation";
-  const donationIsExternal = donationUrl.startsWith("http");
+  const donationUrl = process.env.NEXT_PUBLIC_STRIPE_PAYMENT_LINK;
   const filterHiddenInputs = (prefix: string) =>
     filters.map((filter) => (
       <input key={`${prefix}-${filter}`} type="hidden" name="filter" value={filter} />
     ));
-  const cityHref = (citySlug: string) => {
-    const citySearchParams = new URLSearchParams();
-
-    citySearchParams.set("location", citySlug);
-    citySearchParams.set("category", category);
-    for (const filter of filters) {
-      citySearchParams.append("filter", filter);
-    }
-    citySearchParams.set("sort", sort);
-
-    return `/search?${citySearchParams.toString()}`;
-  };
 
   return (
     <main>
@@ -177,44 +165,23 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
                 Go
               </button>
             </form>
-            <form action="/search">
-              <input type="hidden" name="category" value={category} />
-              {filterHiddenInputs("sort")}
-              {cityForSearch ? (
-                <input type="hidden" name="location" value={cityForSearch.slug} />
-              ) : activeUserLocation ? (
-                <>
-                  <input type="hidden" name="lat" value={String(activeUserLocation.latitude)} />
-                  <input type="hidden" name="lon" value={String(activeUserLocation.longitude)} />
-                </>
-              ) : null}
-              <select
-                name="sort"
-                defaultValue={sort}
-                className="h-11 w-full rounded-lg border border-slate-200 px-3 text-sm outline-none focus:border-teal-600 focus:ring-4 focus:ring-teal-100"
-              >
-                <option value="relevance">Sort by relevance</option>
-                <option value="popularity">Sort by popularity</option>
-                <option value="newest">Sort by newest</option>
-              </select>
-            </form>
+            <SearchSortSelect
+              category={category}
+              filters={filters}
+              latitude={activeUserLocation?.latitude ?? null}
+              location={activeUserLocation ? null : cityForSearch?.slug ?? requestedLocation ?? null}
+              longitude={activeUserLocation?.longitude ?? null}
+              sort={sort}
+            />
           </div>
-          <div className="mt-3 flex flex-wrap gap-2">
-            {cities.slice(0, 6).map((city) => (
-              <Link
-                key={city.id}
-                href={cityHref(city.slug)}
-                className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm font-medium transition ${
-                  cityForSearch?.id === city.id
-                    ? "border-teal-700 bg-teal-700 text-white"
-                    : "border-slate-200 bg-white text-slate-600 hover:border-teal-300 hover:bg-teal-50"
-                }`}
-              >
-                <MapPin aria-hidden="true" size={14} />
-                {city.name}
-              </Link>
-            ))}
-          </div>
+          <CityPicker
+            activeCitySlug={cityForSearch?.slug ?? null}
+            category={category}
+            cities={cities}
+            filters={filters}
+            popularCities={popularCities}
+            sort={sort}
+          />
         </div>
 
         <div className="mb-5 grid gap-4 lg:grid-cols-[minmax(0,1fr)_310px] lg:items-end">
@@ -228,15 +195,17 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
               {searchResult.totalCount} matching places. {mapPlaces.length} shown on map.
             </p>
           </div>
-          <a
-            href={donationUrl}
-            target={donationIsExternal ? "_blank" : undefined}
-            rel={donationIsExternal ? "noreferrer" : undefined}
-            className="inline-flex min-h-12 items-center justify-center gap-2 rounded-lg bg-rose-600 px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-rose-700"
-          >
-            <HeartHandshake aria-hidden="true" size={18} />
-            Free for users. Donate.
-          </a>
+          {donationUrl ? (
+            <a
+              href={donationUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex min-h-12 items-center justify-center gap-2 rounded-lg bg-rose-600 px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-rose-700"
+            >
+              <HeartHandshake aria-hidden="true" size={18} />
+              Free for users. Donate.
+            </a>
+          ) : null}
         </div>
 
         <PlaceMap

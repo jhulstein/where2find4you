@@ -3,7 +3,7 @@
 import { FormEvent, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowRight, Search } from "lucide-react";
+import { ArrowRight, LoaderCircle, Search } from "lucide-react";
 import { exampleSearches } from "@/lib/data/exampleSearches";
 import { normalizeQuery } from "@/lib/search/ranking";
 
@@ -28,6 +28,7 @@ export function SearchBar({
 }: SearchBarProps) {
   const router = useRouter();
   const [query, setQuery] = useState(defaultValue);
+  const [isSearching, setIsSearching] = useState(false);
 
   function searchPath(searchQuery: string) {
     const trimmed = normalizeQuery(searchQuery);
@@ -56,6 +57,7 @@ export function SearchBar({
 
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    setIsSearching(true);
     router.push(searchPath(query));
   }
 
@@ -100,12 +102,22 @@ export function SearchBar({
           </div>
           <button
             type="submit"
+            disabled={isSearching}
             className={`inline-flex items-center justify-center gap-2 rounded-lg bg-slate-950 px-5 font-semibold text-white transition hover:bg-slate-800 ${
               compact ? "h-12 text-sm" : "h-14 text-base"
-            }`}
+            } disabled:cursor-wait disabled:opacity-75`}
           >
-            Search
-            <ArrowRight aria-hidden="true" size={18} />
+            {isSearching ? (
+              <>
+                <LoaderCircle aria-hidden="true" size={18} className="animate-spin" />
+                Loading...
+              </>
+            ) : (
+              <>
+                Search
+                <ArrowRight aria-hidden="true" size={18} />
+              </>
+            )}
           </button>
         </div>
       </form>

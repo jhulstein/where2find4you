@@ -1,7 +1,7 @@
 "use client";
 
 import L from "leaflet";
-import { LocateFixed } from "lucide-react";
+import { Copy, ExternalLink, LoaderCircle, LocateFixed } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { MapContainer, Marker, Popup, TileLayer } from "react-leaflet";
 import { useMap } from "react-leaflet";
@@ -64,6 +64,7 @@ export default function LeafletMap({
   const [locationState, setLocationState] = useState<LocationState>(
     initialPosition ? "ready" : "idle",
   );
+  const [copiedPlaceId, setCopiedPlaceId] = useState<string | null>(null);
   const scoreByPlaceId = scores.reduce<Record<string, number>>(
     (accumulator, score) => {
       accumulator[score.placeId] = score.totalScore;
@@ -116,6 +117,23 @@ export default function LeafletMap({
       { enableHighAccuracy: true, maximumAge: 60000, timeout: 8000 },
     );
   }, [updateSearchOnLocate]);
+
+  const copyAddress = useCallback(async (placeId: string, address: string) => {
+    if (!address || !("clipboard" in navigator)) {
+      return;
+    }
+
+    try {
+      await navigator.clipboard.writeText(address);
+      setCopiedPlaceId(placeId);
+      window.setTimeout(
+        () => setCopiedPlaceId((current) => (current === placeId ? null : current)),
+        1800,
+      );
+    } catch {
+      setCopiedPlaceId(null);
+    }
+  }, []);
 
   useEffect(() => {
     if (!preferUserLocation || !("permissions" in navigator)) {
@@ -174,10 +192,19 @@ export default function LeafletMap({
           <button
             type="button"
             onClick={requestUserPosition}
-            className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-800 shadow-sm transition hover:bg-slate-50"
+            disabled={locationState === "locating"}
+            className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-800 shadow-sm transition hover:bg-slate-50 disabled:cursor-wait disabled:opacity-75"
           >
-            <LocateFixed aria-hidden="true" size={16} />
-            {locationState === "ready" ? "Your position" : "Use my position"}
+            {locationState === "locating" ? (
+              <LoaderCircle aria-hidden="true" size={16} className="animate-spin" />
+            ) : (
+              <LocateFixed aria-hidden="true" size={16} />
+            )}
+            {locationState === "locating"
+              ? "Loading..."
+              : locationState === "ready"
+                ? "Your position"
+                : "Use my position"}
           </button>
           {locationMessage ? (
             <p
@@ -218,6 +245,8 @@ export default function LeafletMap({
         {places.map((place) => {
           const profileHref = placeProfileHref(place);
           const profileIsExternal = isExternalPlaceProfile(place);
+          const fullAddress = [place.address, place.city, place.country].filter(Boolean).join(", ");
+          const copied = copiedPlaceId === place.id;
 
           return (
             <Marker
@@ -226,21 +255,45 @@ export default function LeafletMap({
               position={[place.latitude, place.longitude]}
             >
               <Popup>
-                <div className="min-w-44">
-                  <p className="font-semibold">{place.name}</p>
-                  <p className="text-sm capitalize">{place.category.replace("-", " ")}</p>
-                  <p className="mt-1 text-sm text-slate-600">{place.city}</p>
+                <div className="min-w-56 max-w-64">
+                  <p className="font-semibold text-slate-950">{place.name}</p>
+                  <p className="mt-1 text-sm leading-5 text-slate-600">{fullAddress || place.city}</p>
                   {scoreByPlaceId[place.id] ? (
                     <p className="mt-1 text-sm">Score {scoreByPlaceId[place.id]}</p>
                   ) : null}
-                  <a
-                    href={profileHref}
-                    className="mt-2 inline-block text-sm font-semibold text-teal-700"
-                    target={profileIsExternal ? "_blank" : undefined}
-                    rel={profileIsExternal ? "noreferrer" : undefined}
-                  >
-                    {profileIsExternal ? "Open in OSM" : "View profile"}
-                  </a>
+                  <div className="mt-3 flex flex-col gap-2">
+                    {place.websiteUrl ? (
+                      <a
+                        href={place.websiteUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex min-h-9 items-center justify-center gap-1.5 rounded-lg bg-teal-700 px-3 text-sm font-semibold text-white transition hover:bg-teal-800"
+                      >
+                        Website
+                        <ExternalLink aria-hidden="true" size={14} />
+                      </a>
+                    ) : null}
+                    <button
+                      type="button"
+                      onClick={() => copyAddress(place.id, fullAddress || place.name)}
+                      className={`inline-flex min-h-9 items-center justify-center gap-1.5 rounded-lg px-3 text-sm font-semibold transition ${
+                        place.websiteUrl
+                          ? "border border-slate-200 text-slate-700 hover:bg-slate-50"
+                          : "bg-slate-950 text-white hover:bg-slate-800"
+                      }`}
+                    >
+                      <Copy aria-hidden="true" size={14} />
+                      {copied ? "Address copied" : "Copy address"}
+                    </button>
+                    {!profileIsExternal ? (
+                      <a
+                        href={profileHref}
+                        className="inline-flex min-h-9 items-center justify-center rounded-lg border border-slate-200 px-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+                      >
+                        View profile
+                      </a>
+                    ) : null}
+                  </div>
                 </div>
               </Popup>
             </Marker>

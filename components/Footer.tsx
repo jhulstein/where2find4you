@@ -5,7 +5,7 @@ export function Footer() {
   return (
     <footer className="border-t border-slate-200 bg-white">
       <ResponsiveContainer className="py-8">
-        <div className="grid gap-6 md:grid-cols-[1.5fr_1fr_1fr]">
+        <div className="grid gap-6 md:grid-cols-[1.5fr_1fr]">
           <div>
             <p className="font-semibold text-slate-950">where2find4you.com</p>
             <p className="mt-2 max-w-xl text-sm leading-6 text-slate-600">
@@ -23,14 +23,6 @@ export function Footer() {
               <Link href="/search">Search places</Link>
               <Link href="/business">For businesses</Link>
               <Link href="/about">About</Link>
-            </div>
-          </div>
-          <div>
-            <p className="font-semibold text-slate-950">Operate</p>
-            <div className="mt-3 grid gap-2 text-sm text-slate-600">
-              <Link href="/admin">Admin dashboard</Link>
-              <Link href="/admin/import">Import places</Link>
-              <Link href="/admin/leads">Business leads</Link>
             </div>
           </div>
         </div>
