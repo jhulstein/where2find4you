@@ -7,6 +7,7 @@ import { MapContainer, Marker, Popup, TileLayer } from "react-leaflet";
 import { useMap } from "react-leaflet";
 import type { PlaceMapProps } from "@/components/PlaceMap";
 import { isExternalPlaceProfile, placeProfileHref } from "@/lib/placeLinks";
+import type { Place } from "@/lib/types";
 
 const defaultCenter: [number, number] = [59.9139, 10.7522];
 type LocationState =
@@ -48,6 +49,152 @@ function RecenterMap({ center, zoom }: { center: [number, number]; zoom: number 
   return null;
 }
 
+function normalizeAddressPart(value: string) {
+  return value
+    .trim()
+    .replace(/\s+/g, " ")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+}
+
+function compactAddressParts(parts: Array<string | null | undefined>) {
+  const seen = new Set<string>();
+
+  return parts
+    .map((part) => part?.trim())
+    .filter((part): part is string => Boolean(part))
+    .filter((part) => {
+      const normalized = normalizeAddressPart(part);
+
+      if (!normalized || seen.has(normalized)) {
+        return false;
+      }
+
+      seen.add(normalized);
+      return true;
+    })
+    .join(", ");
+}
+
+function placeAddress(place: Place) {
+  return compactAddressParts([place.address, place.city, place.country]);
+}
+
+function needsResolvedAddress(place: Place) {
+  const address = place.address.trim();
+  const normalizedAddress = normalizeAddressPart(address);
+  const normalizedCity = normalizeAddressPart(place.city);
+  const normalizedCountry = normalizeAddressPart(place.country);
+
+  return (
+    place.source === "openstreetmap" &&
+    (!address ||
+      normalizedAddress === normalizedCity ||
+      normalizedAddress === normalizedCountry ||
+      !/\d/.test(address))
+  );
+}
+
+function PlacePopupContent({
+  copied,
+  isActive,
+  onCopyAddress,
+  place,
+  score,
+}: {
+  copied: boolean;
+  isActive: boolean;
+  onCopyAddress: (placeId: string, address: string) => void;
+  place: Place;
+  score?: number;
+}) {
+  const [resolvedAddress, setResolvedAddress] = useState<string | null>(null);
+  const profileHref = placeProfileHref(place);
+  const profileIsExternal = isExternalPlaceProfile(place);
+  const fallbackAddress = placeAddress(place);
+  const visibleAddress = resolvedAddress ?? fallbackAddress;
+
+  useEffect(() => {
+    if (!isActive || !needsResolvedAddress(place)) {
+      return;
+    }
+
+    const controller = new AbortController();
+    const searchParams = new URLSearchParams({
+      lat: place.latitude.toString(),
+      lon: place.longitude.toString(),
+    });
+
+    void fetch(`/api/reverse-address?${searchParams.toString()}`, {
+      signal: controller.signal,
+    })
+      .then((response) => (response.ok ? response.json() : null))
+      .then((data: unknown) => {
+        const address =
+          data && typeof data === "object" && "address" in data
+            ? (data as { address?: unknown }).address
+            : null;
+
+        if (typeof address === "string" && address.trim()) {
+          setResolvedAddress(address);
+        }
+      })
+      .catch(() => undefined);
+
+    return () => controller.abort();
+  }, [
+    isActive,
+    place.address,
+    place.city,
+    place.country,
+    place.latitude,
+    place.longitude,
+    place.source,
+  ]);
+
+  return (
+    <div className="min-w-56 max-w-64">
+      <p className="font-semibold text-slate-950">{place.name}</p>
+      <p className="mt-1 text-sm leading-5 text-slate-600">{visibleAddress || place.city}</p>
+      {score ? <p className="mt-1 text-sm">Score {score}</p> : null}
+      <div className="mt-3 flex flex-col gap-2">
+        {place.websiteUrl ? (
+          <a
+            href={place.websiteUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex min-h-9 items-center justify-center gap-1.5 rounded-lg bg-teal-700 px-3 text-sm font-semibold !text-white transition hover:bg-teal-800 hover:!text-white"
+          >
+            Website
+            <ExternalLink aria-hidden="true" size={14} className="!text-white" />
+          </a>
+        ) : null}
+        <button
+          type="button"
+          onClick={() => onCopyAddress(place.id, visibleAddress || place.name)}
+          className={`inline-flex min-h-9 items-center justify-center gap-1.5 rounded-lg px-3 text-sm font-semibold transition ${
+            place.websiteUrl
+              ? "border border-slate-200 text-slate-700 hover:bg-slate-50"
+              : "bg-slate-950 text-white hover:bg-slate-800"
+          }`}
+        >
+          <Copy aria-hidden="true" size={14} />
+          {copied ? "Address copied" : "Copy address"}
+        </button>
+        {!profileIsExternal ? (
+          <a
+            href={profileHref}
+            className="inline-flex min-h-9 items-center justify-center rounded-lg border border-slate-200 px-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+          >
+            View profile
+          </a>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
 export default function LeafletMap({
   city,
   initialUserLocation = null,
@@ -65,6 +212,7 @@ export default function LeafletMap({
     initialPosition ? "ready" : "idle",
   );
   const [copiedPlaceId, setCopiedPlaceId] = useState<string | null>(null);
+  const [activePopupPlaceId, setActivePopupPlaceId] = useState<string | null>(null);
   const scoreByPlaceId = scores.reduce<Record<string, number>>(
     (accumulator, score) => {
       accumulator[score.placeId] = score.totalScore;
@@ -243,58 +391,25 @@ export default function LeafletMap({
           </Marker>
         ) : null}
         {places.map((place) => {
-          const profileHref = placeProfileHref(place);
-          const profileIsExternal = isExternalPlaceProfile(place);
-          const fullAddress = [place.address, place.city, place.country].filter(Boolean).join(", ");
-          const copied = copiedPlaceId === place.id;
-
           return (
             <Marker
               key={place.id}
+              eventHandlers={{
+                popupclose: () =>
+                  setActivePopupPlaceId((current) => (current === place.id ? null : current)),
+                popupopen: () => setActivePopupPlaceId(place.id),
+              }}
               icon={markerIcon}
               position={[place.latitude, place.longitude]}
             >
               <Popup>
-                <div className="min-w-56 max-w-64">
-                  <p className="font-semibold text-slate-950">{place.name}</p>
-                  <p className="mt-1 text-sm leading-5 text-slate-600">{fullAddress || place.city}</p>
-                  {scoreByPlaceId[place.id] ? (
-                    <p className="mt-1 text-sm">Score {scoreByPlaceId[place.id]}</p>
-                  ) : null}
-                  <div className="mt-3 flex flex-col gap-2">
-                    {place.websiteUrl ? (
-                      <a
-                        href={place.websiteUrl}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="inline-flex min-h-9 items-center justify-center gap-1.5 rounded-lg bg-teal-700 px-3 text-sm font-semibold text-white transition hover:bg-teal-800"
-                      >
-                        Website
-                        <ExternalLink aria-hidden="true" size={14} />
-                      </a>
-                    ) : null}
-                    <button
-                      type="button"
-                      onClick={() => copyAddress(place.id, fullAddress || place.name)}
-                      className={`inline-flex min-h-9 items-center justify-center gap-1.5 rounded-lg px-3 text-sm font-semibold transition ${
-                        place.websiteUrl
-                          ? "border border-slate-200 text-slate-700 hover:bg-slate-50"
-                          : "bg-slate-950 text-white hover:bg-slate-800"
-                      }`}
-                    >
-                      <Copy aria-hidden="true" size={14} />
-                      {copied ? "Address copied" : "Copy address"}
-                    </button>
-                    {!profileIsExternal ? (
-                      <a
-                        href={profileHref}
-                        className="inline-flex min-h-9 items-center justify-center rounded-lg border border-slate-200 px-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
-                      >
-                        View profile
-                      </a>
-                    ) : null}
-                  </div>
-                </div>
+                <PlacePopupContent
+                  copied={copiedPlaceId === place.id}
+                  isActive={activePopupPlaceId === place.id}
+                  onCopyAddress={copyAddress}
+                  place={place}
+                  score={scoreByPlaceId[place.id]}
+                />
               </Popup>
             </Marker>
           );

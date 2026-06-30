@@ -164,7 +164,13 @@ function tagList(
 }
 
 function addressFrom(tags: Record<string, string>) {
-  return [tags["addr:street"], tags["addr:housenumber"]].filter(Boolean).join(" ");
+  const streetLine = [tags["addr:street"], tags["addr:housenumber"]]
+    .filter(Boolean)
+    .join(" ");
+  const namedPlace = tags["addr:place"] ?? tags["addr:neighbourhood"] ?? tags["addr:suburb"];
+  const postcode = tags["addr:postcode"];
+
+  return [streetLine || namedPlace, streetLine ? postcode : null].filter(Boolean).join(", ");
 }
 
 function slugify(value: string) {
@@ -213,7 +219,7 @@ function toPlace(element: OsmElement, input: NormalizedOsmSearchInput): Place | 
   }
 
   const category = categoryFor(tags, input.category);
-  const address = addressFrom(tags) || input.city.name;
+  const address = addressFrom(tags);
 
   return {
     id: `osm-${element.type}-${element.id}`,
@@ -230,8 +236,8 @@ function toPlace(element: OsmElement, input: NormalizedOsmSearchInput): Place | 
       tags.internet_access ? "Wi-Fi signal listed in OpenStreetMap" : null,
     ].find(Boolean) ?? `OpenStreetMap ${category.replace("-", " ")} listing.`,
     address,
-    city: input.city.name,
-    country: input.city.country,
+    city: tags["addr:city"] ?? input.city.name,
+    country: tags["addr:country"] ?? input.city.country,
     latitude,
     longitude,
     websiteUrl: tags.website ?? tags["contact:website"] ?? null,
