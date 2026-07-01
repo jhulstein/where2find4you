@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { LoaderCircle } from "lucide-react";
 import { searchFilterOptions, type SearchFilterId } from "@/lib/searchFilters";
@@ -23,7 +23,12 @@ export function CategoryFilter({
   sort = "relevance",
 }: CategoryFilterProps) {
   const router = useRouter();
-  const [loadingId, setLoadingId] = useState<SearchFilterId | null>(null);
+  const [isPending, startTransition] = useTransition();
+  const [pendingId, setPendingId] = useState<SearchFilterId | null>(null);
+
+  function currentHref() {
+    return `${window.location.pathname}${window.location.search}`;
+  }
 
   function hrefFor(optionId: SearchFilterId) {
     const searchParams = new URLSearchParams();
@@ -59,14 +64,22 @@ export function CategoryFilter({
   }
 
   function navigate(optionId: SearchFilterId) {
-    setLoadingId(optionId);
-    router.push(hrefFor(optionId));
+    const href = hrefFor(optionId);
+
+    if (href === currentHref()) {
+      return;
+    }
+
+    setPendingId(optionId);
+    startTransition(() => {
+      router.push(href);
+    });
   }
 
   return (
     <div className="flex gap-2 overflow-x-auto pb-2">
       {searchFilterOptions.map((category) => {
-        const isLoading = loadingId === category.id;
+        const isLoading = isPending && pendingId === category.id;
         const isActive =
           category.id === "free-wifi"
             ? activeFilters.includes("free_wifi")
@@ -77,16 +90,15 @@ export function CategoryFilter({
             key={category.id}
             type="button"
             onClick={() => navigate(category.id)}
-            disabled={loadingId !== null}
             className={`shrink-0 rounded-full border px-3 py-2 text-sm font-medium transition ${
               isActive
                 ? "border-slate-950 bg-slate-950 text-white"
                 : "border-slate-200 bg-white text-slate-700 hover:border-teal-300 hover:bg-teal-50"
-            } disabled:cursor-wait disabled:opacity-70`}
+            }`}
           >
             <span className="inline-flex items-center gap-1.5">
               {isLoading ? <LoaderCircle aria-hidden="true" size={14} className="animate-spin" /> : null}
-              {isLoading ? "Loading..." : category.label}
+              {category.label}
             </span>
           </button>
         );

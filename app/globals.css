@@ -39,6 +39,30 @@ textarea {
   border-radius: 8px;
 }
 
+.fit-results-leaflet-control {
+  margin-top: 10px;
+}
+
+.fit-results-button {
+  align-items: center;
+  background: #ffffff;
+  border: 0;
+  color: #0f172a;
+  cursor: pointer;
+  display: flex;
+  font-size: 12px;
+  font-weight: 700;
+  min-height: 34px;
+  padding: 0 10px;
+  white-space: nowrap;
+}
+
+.fit-results-button:hover,
+.fit-results-button:focus {
+  background: #f8fafc;
+  color: #0f766e;
+}
+
 .scout-marker {
   align-items: center;
   background: #0f766e;

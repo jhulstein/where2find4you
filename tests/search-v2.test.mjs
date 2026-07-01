@@ -341,6 +341,15 @@ test("restaurant intent variants include English, Norwegian and Swedish terms", 
   assert.deepEqual(idsFor("spisested"), ["fjord-dinner-house"]);
 });
 
+test("suggested romantic waterfront restaurant search broadens sparse strict matches", () => {
+  const ids = idsFor("Find a romantic restaurant near the waterfront", { location: oslo });
+
+  assert.equal(ids[0], "waterfront-table");
+  assert.equal(ids.length > 1, true);
+  assert.equal(ids.includes("fjord-dinner-house"), true);
+  assert.equal(ids.includes("espresso-harbor-bar"), true);
+});
+
 test("ranking keeps exact name and structured matches above description-only matches", () => {
   const cafeResults = idsFor("Quiet Corner Café");
   const wifiResults = idsFor("free wifi");

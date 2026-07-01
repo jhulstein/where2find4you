@@ -5,6 +5,7 @@ import { searchOsmPlaces } from "@/lib/search/osmPlaces";
 import {
   DEFAULT_SEARCH_RADIUS_KM,
   detectSearchIntent,
+  isBroadIntentSearch,
   matchesSearchIntent,
   normalizeQuery,
   searchPlaceRecords,
@@ -405,7 +406,7 @@ export async function searchPlaces(input: SearchServiceInput = {}): Promise<Sear
     : null;
 
   if (typesenseSearch) {
-    return {
+    const typesenseResult: SearchServiceResult = {
       category,
       city,
       debug: typesenseSearch.debug,
@@ -434,6 +435,31 @@ export async function searchPlaces(input: SearchServiceInput = {}): Promise<Sear
       totalCount: typesenseSearch.totalCount,
       userLocationAvailable: Boolean(effectiveUserLocation),
     };
+    const shouldBroaden =
+      isBroadIntentSearch(normalizedQuery) &&
+      typesenseResult.totalCount < Math.min(4, pageSize);
+
+    if (!shouldBroaden) {
+      return typesenseResult;
+    }
+
+    const fallbackResult = await searchFallbackPlaces({
+      ...input,
+      category,
+      city,
+      filters,
+      normalizedQuery,
+      offset,
+      page,
+      pageSize,
+      radiusKm,
+      sort,
+      userLocation: effectiveUserLocation,
+    });
+
+    return fallbackResult.totalCount > typesenseResult.totalCount
+      ? fallbackResult
+      : typesenseResult;
   }
 
   return searchFallbackPlaces({

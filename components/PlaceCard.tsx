@@ -8,6 +8,7 @@ import {
 import { SponsoredBadge } from "@/components/SponsoredBadge";
 import { TrackingLink } from "@/components/TrackingLink";
 import { isExternalPlaceProfile, placeProfileHref } from "@/lib/placeLinks";
+import { isSponsoredPlace } from "@/lib/placeMonetization";
 import type { Place, PlaceAnalytics } from "@/lib/types";
 
 type PlaceCardProps = {
@@ -29,6 +30,7 @@ export function PlaceCard({
   const mapUrl = `https://www.google.com/maps/search/?api=1&query=${place.latitude},${place.longitude}`;
   const profileHref = placeProfileHref(place);
   const profileIsExternal = isExternalPlaceProfile(place);
+  const isSponsored = isSponsoredPlace(place);
 
   return (
     <article className="flex h-full flex-col rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition hover:-translate-y-0.5 hover:border-teal-300 hover:shadow-md">
@@ -38,7 +40,7 @@ export function PlaceCard({
             <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold capitalize text-slate-700">
               {place.category.replace("-", " ")}
             </span>
-            {place.isSponsored ? <SponsoredBadge /> : null}
+            {isSponsored ? <SponsoredBadge /> : null}
           </div>
           <h2 className="mt-3 text-lg font-semibold text-slate-950">
             <TrackingLink

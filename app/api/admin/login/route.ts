@@ -1,17 +1,5 @@
 import { NextResponse } from "next/server";
-
-const adminCookieName = "where2find4you_admin";
-
-function adminPassword() {
-  return process.env.ADMIN_PASSWORD ??
-    process.env.W2F_ADMIN_PASSWORD ??
-    process.env.ADMIN_ACCESS_TOKEN ??
-    "";
-}
-
-function adminToken() {
-  return process.env.ADMIN_ACCESS_TOKEN ?? adminPassword();
-}
+import { adminCookieName, adminPassword, adminSessionValue } from "@/lib/adminAuth";
 
 function safeNext(value: FormDataEntryValue | null) {
   const next = typeof value === "string" ? value : "/admin";
@@ -34,7 +22,7 @@ export async function POST(request: Request) {
   }
 
   const response = NextResponse.redirect(new URL(next, request.url));
-  response.cookies.set(adminCookieName, adminToken(), {
+  response.cookies.set(adminCookieName, await adminSessionValue(), {
     httpOnly: true,
     maxAge: 60 * 60 * 8,
     path: "/",

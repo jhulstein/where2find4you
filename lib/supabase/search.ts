@@ -73,6 +73,7 @@ function rowToPlace(row: SearchPlacesRow): Place {
     source: row.source,
     sourceId: row.source_id,
     tags: row.tags ?? [],
+    sponsored: row.is_sponsored,
     isSponsored: row.is_sponsored,
     sponsoredPriority: row.sponsored_priority,
     isActive: row.is_active,

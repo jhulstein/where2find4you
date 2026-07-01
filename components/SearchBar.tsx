@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowRight, LoaderCircle, Search } from "lucide-react";
@@ -27,8 +27,11 @@ export function SearchBar({
   sort,
 }: SearchBarProps) {
   const router = useRouter();
-  const [query, setQuery] = useState(defaultValue);
-  const [isSearching, setIsSearching] = useState(false);
+  const [isPending, startTransition] = useTransition();
+
+  function currentHref() {
+    return `${window.location.pathname}${window.location.search}`;
+  }
 
   function searchPath(searchQuery: string) {
     const trimmed = normalizeQuery(searchQuery);
@@ -57,8 +60,16 @@ export function SearchBar({
 
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setIsSearching(true);
-    router.push(searchPath(query));
+    const formData = new FormData(event.currentTarget);
+    const href = searchPath(String(formData.get("q") ?? ""));
+
+    if (href === currentHref()) {
+      return;
+    }
+
+    startTransition(() => {
+      router.push(href);
+    });
   }
 
   return (
@@ -91,9 +102,9 @@ export function SearchBar({
             />
             <input
               id="global-search"
+              key={defaultValue}
               name="q"
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
+              defaultValue={defaultValue}
               placeholder="What are you trying to find?"
               className={`w-full rounded-lg border border-slate-200 bg-slate-50 pl-11 pr-3 text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-teal-600 focus:bg-white focus:ring-4 focus:ring-teal-100 ${
                 compact ? "h-12" : "h-14 text-base sm:text-lg"
@@ -102,22 +113,14 @@ export function SearchBar({
           </div>
           <button
             type="submit"
-            disabled={isSearching}
+            disabled={isPending}
             className={`inline-flex items-center justify-center gap-2 rounded-lg bg-slate-950 px-5 font-semibold text-white transition hover:bg-slate-800 ${
               compact ? "h-12 text-sm" : "h-14 text-base"
             } disabled:cursor-wait disabled:opacity-75`}
           >
-            {isSearching ? (
-              <>
-                <LoaderCircle aria-hidden="true" size={18} className="animate-spin" />
-                Loading...
-              </>
-            ) : (
-              <>
-                Search
-                <ArrowRight aria-hidden="true" size={18} />
-              </>
-            )}
+            {isPending ? <LoaderCircle aria-hidden="true" size={18} className="animate-spin" /> : null}
+            Search
+            {!isPending ? <ArrowRight aria-hidden="true" size={18} /> : null}
           </button>
         </div>
       </form>

@@ -1,28 +1,14 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { adminCookieName, isAdminSession } from "@/lib/adminAuth";
 
-const adminCookieName = "where2find4you_admin";
-
-function adminToken() {
-  return process.env.ADMIN_ACCESS_TOKEN ??
-    process.env.W2F_ADMIN_PASSWORD ??
-    process.env.ADMIN_PASSWORD ??
-    "";
-}
-
-function isAdmin(request: NextRequest) {
-  const token = adminToken();
-
-  return Boolean(token && request.cookies.get(adminCookieName)?.value === token);
-}
-
-export function proxy(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   if (pathname.startsWith("/admin/login") || pathname === "/api/admin/login") {
     return NextResponse.next();
   }
 
-  if (isAdmin(request)) {
+  if (await isAdminSession(request.cookies.get(adminCookieName)?.value)) {
     return NextResponse.next();
   }
 

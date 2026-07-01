@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { LoaderCircle, MapPin } from "lucide-react";
 import type { City } from "@/lib/types";
@@ -23,8 +23,13 @@ export function CityPicker({
   sort,
 }: CityPickerProps) {
   const router = useRouter();
-  const [loadingCity, setLoadingCity] = useState<string | null>(null);
+  const [isPending, startTransition] = useTransition();
+  const [pendingCity, setPendingCity] = useState<string | null>(null);
   const activeCity = cities.find((city) => city.slug === activeCitySlug) ?? null;
+
+  function currentHref() {
+    return `${window.location.pathname}${window.location.search}`;
+  }
 
   function cityHref(citySlug: string) {
     const searchParams = new URLSearchParams();
@@ -44,8 +49,16 @@ export function CityPicker({
       return;
     }
 
-    setLoadingCity(citySlug);
-    router.push(cityHref(citySlug));
+    const href = cityHref(citySlug);
+
+    if (href === currentHref()) {
+      return;
+    }
+
+    setPendingCity(citySlug);
+    startTransition(() => {
+      router.push(href);
+    });
   }
 
   return (
@@ -59,8 +72,7 @@ export function CityPicker({
             id="city-select"
             value={activeCity?.slug ?? ""}
             onChange={(event) => selectCity(event.target.value)}
-            disabled={loadingCity !== null}
-            className="h-11 w-full rounded-lg border border-slate-200 bg-white px-3 pr-10 text-sm font-medium text-slate-800 outline-none transition focus:border-teal-600 focus:ring-4 focus:ring-teal-100 disabled:cursor-wait disabled:opacity-70"
+            className="h-11 w-full rounded-lg border border-slate-200 bg-white px-3 pr-10 text-sm font-medium text-slate-800 outline-none transition focus:border-teal-600 focus:ring-4 focus:ring-teal-100"
           >
             <option value="" disabled>
               Choose city
@@ -71,7 +83,7 @@ export function CityPicker({
               </option>
             ))}
           </select>
-          {loadingCity ? (
+          {isPending && pendingCity ? (
             <LoaderCircle
               aria-hidden="true"
               size={16}
@@ -87,26 +99,25 @@ export function CityPicker({
       <div className="flex flex-wrap gap-2">
         {popularCities.map((city) => {
           const isActive = activeCity?.id === city.id;
-          const isLoading = loadingCity === city.slug;
+          const isLoading = isPending && pendingCity === city.slug;
 
           return (
             <button
               key={city.id}
               type="button"
               onClick={() => selectCity(city.slug)}
-              disabled={loadingCity !== null}
               className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm font-medium transition ${
                 isActive
                   ? "border-teal-700 bg-teal-700 text-white"
                   : "border-slate-200 bg-white text-slate-600 hover:border-teal-300 hover:bg-teal-50"
-              } disabled:cursor-wait disabled:opacity-70`}
+              }`}
             >
               {isLoading ? (
                 <LoaderCircle aria-hidden="true" size={14} className="animate-spin" />
               ) : (
                 <MapPin aria-hidden="true" size={14} />
               )}
-              {isLoading ? "Loading..." : city.name}
+              {city.name}
             </button>
           );
         })}

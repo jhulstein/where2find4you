@@ -49,6 +49,63 @@ function RecenterMap({ center, zoom }: { center: [number, number]; zoom: number 
   return null;
 }
 
+function fitMapToPositions(map: L.Map, positions: Array<[number, number]>) {
+  if (positions.length === 0) {
+    return;
+  }
+
+  if (positions.length === 1) {
+    map.setView(positions[0], 15, { animate: true });
+    return;
+  }
+
+  map.fitBounds(L.latLngBounds(positions).pad(0.12), {
+    animate: true,
+    maxZoom: 15,
+    padding: [36, 36],
+  });
+}
+
+function FitResultsControl({ positions }: { positions: Array<[number, number]> }) {
+  const map = useMap();
+
+  useEffect(() => {
+    if (positions.length === 0) {
+      return;
+    }
+
+    const control = new L.Control({ position: "topleft" });
+
+    control.onAdd = () => {
+      const container = L.DomUtil.create(
+        "div",
+        "leaflet-control leaflet-bar fit-results-leaflet-control",
+      );
+      const button = L.DomUtil.create("button", "fit-results-button", container);
+
+      button.type = "button";
+      button.textContent = "Fit results";
+      button.setAttribute("aria-label", "Fit map to result markers");
+      L.DomEvent.disableClickPropagation(container);
+      L.DomEvent.disableScrollPropagation(container);
+      L.DomEvent.on(button, "click", (event: Event) => {
+        L.DomEvent.stop(event);
+        fitMapToPositions(map, positions);
+      });
+
+      return container;
+    };
+
+    control.addTo(map);
+
+    return () => {
+      control.remove();
+    };
+  }, [map, positions]);
+
+  return null;
+}
+
 function normalizeAddressPart(value: string) {
   return value
     .trim()
@@ -145,6 +202,7 @@ function PlacePopupContent({
     return () => controller.abort();
   }, [
     isActive,
+    place,
     place.address,
     place.city,
     place.country,
@@ -221,6 +279,10 @@ export default function LeafletMap({
     {},
   );
   const fallbackCenter = useMemo(() => mapCenter({ city, places, scores }), [city, places, scores]);
+  const resultPositions = useMemo(
+    () => places.map((place) => [place.latitude, place.longitude] as [number, number]),
+    [places],
+  );
   const center = userPosition ?? fallbackCenter;
   const zoom = userPosition ? 15 : city && places.length === 0 ? 12 : places.length > 1 ? 13 : 14;
 
@@ -366,6 +428,7 @@ export default function LeafletMap({
       ) : null}
       <MapContainer center={center} scrollWheelZoom={false} zoom={zoom}>
         <RecenterMap center={center} zoom={zoom} />
+        <FitResultsControl positions={resultPositions} />
         <TileLayer
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"

@@ -247,6 +247,7 @@ function toPlace(element: OsmElement, input: NormalizedOsmSearchInput): Place | 
     source: "openstreetmap",
     sourceId: `${element.type}/${element.id}`,
     tags: tagList(tags, category, input.category, input.query),
+    sponsored: false,
     isSponsored: false,
     sponsoredPriority: 0,
     isActive: true,

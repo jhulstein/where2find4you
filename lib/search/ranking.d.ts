@@ -51,6 +51,8 @@ export function singularizeSearchTerm(term: string): string;
 
 export function detectSearchIntent(query: string): SearchIntentResult;
 
+export function isBroadIntentSearch(query: string): boolean;
+
 export function matchesSearchIntent(place: Place, intentId: string): boolean;
 
 export function placeMatchesFilterId(place: Place, filter?: string): boolean;

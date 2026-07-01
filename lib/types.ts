@@ -52,6 +52,7 @@ export type Place = {
   hasWifi?: boolean;
   freeWifi?: boolean;
   isVerified?: boolean;
+  sponsored?: boolean;
   isSponsored: boolean;
   sponsoredPriority: number;
   isActive: boolean;

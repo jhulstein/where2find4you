@@ -25,6 +25,8 @@ SUPABASE_SERVICE_ROLE_KEY=
 OPENAI_API_KEY=
 NEXT_PUBLIC_SITE_URL=https://where2find4you.com
 NEXT_PUBLIC_DONATION_URL=
+NEXT_PUBLIC_STRIPE_PAYMENT_LINK=
+ADMIN_PASSWORD=
 TYPESENSE_HOST=
 TYPESENSE_PORT=8108
 TYPESENSE_PROTOCOL=https
@@ -34,9 +36,11 @@ TYPESENSE_COLLECTION=places_v1
 ```
 
 The MVP works with local seed data without credentials.
-`NEXT_PUBLIC_DONATION_URL` is optional. Add a Stripe, PayPal, Buy Me a Coffee
-or similar donation URL when it is ready; until then the donation button points
-to the contact page.
+`NEXT_PUBLIC_DONATION_URL` is legacy and optional.
+`NEXT_PUBLIC_STRIPE_PAYMENT_LINK` is optional and should contain a Stripe
+Payment Link for upgrade/donation buttons. If it is empty, payment buttons are
+hidden or disabled. `ADMIN_PASSWORD` is server-only and must not use the
+`NEXT_PUBLIC_` prefix.
 
 ## Typesense Search
 
@@ -90,6 +94,8 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=
 SUPABASE_SECRET_KEY=
 NEXT_PUBLIC_SITE_URL=https://where2find4you.com
 NEXT_PUBLIC_DONATION_URL=
+NEXT_PUBLIC_STRIPE_PAYMENT_LINK=
+ADMIN_PASSWORD=
 ```
 
 The Supabase secret key is only used inside server routes. Do not expose it with
@@ -137,6 +143,11 @@ To test tracking after deployment:
 - `/admin/import` - OpenStreetMap / Overpass import form placeholder.
 - `/admin/analytics/[slug]` - Per-place analytics.
 - `/admin/leads` - High-interest places to contact for paid promotion.
+
+Admin access is protected server-side. Set `ADMIN_PASSWORD` in local and
+deployment environment variables, open `/admin`, then sign in with that
+password. Normal public navigation does not show admin links. If
+`ADMIN_PASSWORD` is missing, `/admin/login` shows a configuration error.
 
 ## API Routes
 

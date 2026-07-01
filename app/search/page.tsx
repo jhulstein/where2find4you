@@ -5,6 +5,7 @@ import { PlaceCard } from "@/components/PlaceCard";
 import { PlaceMap } from "@/components/PlaceMap";
 import { ResponsiveContainer } from "@/components/ResponsiveContainer";
 import { SearchBar } from "@/components/SearchBar";
+import { SearchResultsList } from "@/components/SearchResultsList";
 import { SearchSortSelect } from "@/components/SearchSortSelect";
 import { getPlaceAnalytics } from "@/lib/analytics";
 import { cities, popularCities } from "@/lib/data/cities";
@@ -74,7 +75,7 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
   const searchResult = await searchPlaces({
     category: requestedCategory,
     filters: activeFilters,
-    limit: 100,
+    limit: 250,
     location: requestedLocation,
     query: rawQuery,
     sort: requestedSort,
@@ -107,8 +108,7 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
         Number.isFinite(place.latitude) &&
         Number.isFinite(place.longitude) &&
         (place.latitude !== 0 || place.longitude !== 0),
-    )
-    .slice(0, 100);
+    );
   const cityLabel = cityForSearch
     ? `${cityForSearch.name}, ${cityForSearch.country}`
     : activeUserLocation
@@ -123,7 +123,7 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
       : `${categoryLabel} ${
           cityForSearch ? `in ${cityForSearch.name}` : activeUserLocation ? "near you" : "in pilot cities"
         }`;
-  const donationUrl = process.env.NEXT_PUBLIC_STRIPE_PAYMENT_LINK;
+  const paymentLink = process.env.NEXT_PUBLIC_STRIPE_PAYMENT_LINK?.trim();
   const filterHiddenInputs = (prefix: string) =>
     filters.map((filter) => (
       <input key={`${prefix}-${filter}`} type="hidden" name="filter" value={filter} />
@@ -195,9 +195,9 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
               {searchResult.totalCount} matching places. {mapPlaces.length} shown on map.
             </p>
           </div>
-          {donationUrl ? (
+          {paymentLink ? (
             <a
-              href={donationUrl}
+              href={paymentLink}
               target="_blank"
               rel="noreferrer"
               className="inline-flex min-h-12 items-center justify-center gap-2 rounded-lg bg-rose-600 px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-rose-700"
@@ -234,17 +234,22 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
           </div>
         </div>
 
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
-          {sorted.map((place, index) => (
-            <PlaceCard
-              key={place.id}
-              place={place}
-              analytics={getPlaceAnalytics(place)}
-              resultPosition={index + 1}
-              searchId={searchRecord.id}
-            />
-          ))}
-        </div>
+        {sorted.length > 0 ? (
+          <SearchResultsList
+            key={`${query}-${category}-${cityForSearch?.slug ?? "all"}-${filters.join(",")}-${sort}`}
+            totalCount={searchResult.totalCount}
+          >
+            {sorted.map((place, index) => (
+              <PlaceCard
+                key={place.id}
+                place={place}
+                analytics={getPlaceAnalytics(place)}
+                resultPosition={index + 1}
+                searchId={searchRecord.id}
+              />
+            ))}
+          </SearchResultsList>
+        ) : null}
         {sorted.length === 0 ? (
           <div className="rounded-xl border border-dashed border-slate-300 bg-white p-6 text-center">
             <h2 className="text-lg font-semibold text-slate-950">No strong matches yet</h2>

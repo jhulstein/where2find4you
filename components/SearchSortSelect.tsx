@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { LoaderCircle } from "lucide-react";
 
@@ -22,7 +22,12 @@ export function SearchSortSelect({
   sort,
 }: SearchSortSelectProps) {
   const router = useRouter();
-  const [isLoading, setIsLoading] = useState(false);
+  const [isPending, startTransition] = useTransition();
+  const [pendingSort, setPendingSort] = useState<string | null>(null);
+
+  function currentHref() {
+    return `${window.location.pathname}${window.location.search}`;
+  }
 
   function hrefFor(nextSort: string) {
     const searchParams = new URLSearchParams();
@@ -43,8 +48,16 @@ export function SearchSortSelect({
   }
 
   function changeSort(nextSort: string) {
-    setIsLoading(true);
-    router.push(hrefFor(nextSort));
+    const href = hrefFor(nextSort);
+
+    if (href === currentHref()) {
+      return;
+    }
+
+    setPendingSort(nextSort);
+    startTransition(() => {
+      router.push(href);
+    });
   }
 
   return (
@@ -53,17 +66,16 @@ export function SearchSortSelect({
         name="sort"
         value={sort}
         onChange={(event) => changeSort(event.target.value)}
-        disabled={isLoading}
-        className="h-11 w-full rounded-lg border border-slate-200 px-3 pr-10 text-sm outline-none focus:border-teal-600 focus:ring-4 focus:ring-teal-100 disabled:cursor-wait disabled:opacity-70"
+        className="h-11 w-full rounded-lg border border-slate-200 px-3 pr-10 text-sm outline-none focus:border-teal-600 focus:ring-4 focus:ring-teal-100"
       >
         <option value="relevance">Sort by relevance</option>
         <option value="popularity">Sort by popularity</option>
         <option value="newest">Sort by newest</option>
       </select>
-      {isLoading ? (
-        <span className="pointer-events-none absolute right-3 top-1/2 inline-flex -translate-y-1/2 items-center gap-1 rounded bg-white pl-1 text-xs font-semibold text-teal-700">
+      {isPending && pendingSort ? (
+        <span className="pointer-events-none absolute right-3 top-1/2 inline-flex -translate-y-1/2 items-center rounded bg-white pl-1 text-teal-700">
           <LoaderCircle aria-hidden="true" size={14} className="animate-spin" />
-          Loading...
+          <span className="sr-only">Sorting results</span>
         </span>
       ) : null}
     </div>

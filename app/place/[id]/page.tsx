@@ -18,6 +18,7 @@ import { TrackingButton } from "@/components/TrackingButton";
 import { TrackingLink } from "@/components/TrackingLink";
 import { getPlaceAnalytics } from "@/lib/analytics";
 import { getPlaceBySlug, samplePlaces } from "@/lib/data/places";
+import { isSponsoredPlace } from "@/lib/placeMonetization";
 
 type PlacePageProps = {
   params: Promise<{ id: string }>;
@@ -46,6 +47,7 @@ export default async function PlacePage({ params }: PlacePageProps) {
 
   const analytics = getPlaceAnalytics(place);
   const mapUrl = `https://www.google.com/maps/search/?api=1&query=${place.latitude},${place.longitude}`;
+  const isSponsored = isSponsoredPlace(place);
 
   return (
     <main>
@@ -60,7 +62,7 @@ export default async function PlacePage({ params }: PlacePageProps) {
               <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold capitalize text-slate-700">
                 {place.category.replace("-", " ")}
               </span>
-              {place.isSponsored ? <SponsoredBadge /> : null}
+              {isSponsored ? <SponsoredBadge /> : null}
             </div>
             <h1 className="mt-4 text-3xl font-semibold text-slate-950 sm:text-4xl">
               {place.name}
