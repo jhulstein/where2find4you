@@ -16,7 +16,7 @@ export default function AdminProductsPage() {
           </h1>
           <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
             Build a clean Patchen list from pasted links, keep affiliate disclosure visible,
-            and prepare promotion data for pages, posts and recommendations.
+            and publish discreet product recommendations through PROMOTED_PRODUCTS_JSON.
           </p>
         </div>
 

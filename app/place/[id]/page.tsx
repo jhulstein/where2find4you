@@ -13,12 +13,14 @@ import {
 } from "lucide-react";
 import { SponsoredBadge } from "@/components/SponsoredBadge";
 import { PlaceViewTracker } from "@/components/PlaceViewTracker";
+import { ProductAdSlot } from "@/components/ProductAdSlot";
 import { ResponsiveContainer } from "@/components/ResponsiveContainer";
 import { TrackingButton } from "@/components/TrackingButton";
 import { TrackingLink } from "@/components/TrackingLink";
 import { getPlaceAnalytics } from "@/lib/analytics";
 import { getPlaceBySlug, samplePlaces } from "@/lib/data/places";
 import { isSponsoredPlace } from "@/lib/placeMonetization";
+import { getPromotedProductsForContext } from "@/lib/promotedProducts";
 
 type PlacePageProps = {
   params: Promise<{ id: string }>;
@@ -48,6 +50,12 @@ export default async function PlacePage({ params }: PlacePageProps) {
   const analytics = getPlaceAnalytics(place);
   const mapUrl = `https://www.google.com/maps/search/?api=1&query=${place.latitude},${place.longitude}`;
   const isSponsored = isSponsoredPlace(place);
+  const promotedProducts = getPromotedProductsForContext({
+    category: place.category,
+    limit: 1,
+    query: `${place.name} ${place.shortDescription}`,
+    tags: place.tags,
+  });
 
   return (
     <main>
@@ -185,6 +193,13 @@ export default async function PlacePage({ params }: PlacePageProps) {
                 </div>
               </div>
             </div>
+            {promotedProducts.length > 0 ? (
+              <ProductAdSlot
+                products={promotedProducts}
+                variant="aside"
+                contextLabel="A small recommendation related to this place."
+              />
+            ) : null}
             <div className="rounded-2xl bg-slate-950 p-5 text-white shadow-sm">
               <Megaphone aria-hidden="true" size={24} className="text-teal-300" />
               <h2 className="mt-3 font-semibold">Visibility opportunity</h2>

@@ -27,6 +27,7 @@ NEXT_PUBLIC_SITE_URL=https://where2find4you.com
 NEXT_PUBLIC_DONATION_URL=
 NEXT_PUBLIC_STRIPE_PAYMENT_LINK=
 NEXT_PUBLIC_AMAZON_ASSOCIATE_TAG=
+PROMOTED_PRODUCTS_JSON=
 ADMIN_PASSWORD=
 TYPESENSE_HOST=
 TYPESENSE_PORT=8108
@@ -44,6 +45,9 @@ hidden or disabled. `ADMIN_PASSWORD` is server-only and must not use the
 `NEXT_PUBLIC_` prefix.
 `NEXT_PUBLIC_AMAZON_ASSOCIATE_TAG` is optional and can contain the public Amazon
 Associates tracking tag to append to pasted Amazon product links in admin.
+`PROMOTED_PRODUCTS_JSON` is optional and can contain the JSON copied from
+Patchen. When configured, the public app shows small affiliate recommendation
+slots in search results and place pages. If it is empty, no product ads render.
 
 ## Typesense Search
 
@@ -99,6 +103,7 @@ NEXT_PUBLIC_SITE_URL=https://where2find4you.com
 NEXT_PUBLIC_DONATION_URL=
 NEXT_PUBLIC_STRIPE_PAYMENT_LINK=
 NEXT_PUBLIC_AMAZON_ASSOCIATE_TAG=
+PROMOTED_PRODUCTS_JSON=
 ADMIN_PASSWORD=
 ```
 
@@ -159,8 +164,10 @@ Use a plain URL, or paste `Title | URL | Description | Image URL | Price |
 Category`. Amazon links get `NEXT_PUBLIC_AMAZON_ASSOCIATE_TAG` added when it is
 configured and no `tag=` parameter exists. The MVP keeps saved product drafts in
 the admin browser's local storage; copy the generated JSON when you are ready to
-move the list into persistent content. Keep the visible affiliate disclosure on
-pages that use affiliate links.
+publish the list. Put the copied JSON in `PROMOTED_PRODUCTS_JSON` in Vercel and
+redeploy. Product ads are shown as small affiliate recommendation slots after a
+few search results and in the side column on place pages. Keep the visible
+affiliate disclosure on pages that use affiliate links.
 
 ## API Routes
 

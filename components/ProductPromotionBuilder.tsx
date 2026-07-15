@@ -54,6 +54,10 @@ function updateSavedProducts(products: PromotedProduct[]) {
   window.dispatchEvent(new Event("where2find4you-products-updated"));
 }
 
+function productMergeKey(product: PromotedProduct) {
+  return product.asin ?? product.id ?? product.url;
+}
+
 function ProductCard({ product }: { product: PromotedProduct }) {
   return (
     <article className="flex h-full flex-col rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
@@ -121,8 +125,23 @@ export function ProductPromotionBuilder({ associateTag = "" }: { associateTag?: 
       return;
     }
 
-    updateSavedProducts(parsed.products);
-    setStatus(`${parsed.products.length} product${parsed.products.length === 1 ? "" : "s"} saved.`);
+    const existingKeys = new Set(savedProducts.map(productMergeKey));
+    const newProducts = parsed.products.filter((product) => !existingKeys.has(productMergeKey(product)));
+    const nextProducts = [...savedProducts, ...newProducts];
+
+    updateSavedProducts(nextProducts);
+
+    if (newProducts.length === 0) {
+      setStatus("Already saved. No new products added.");
+      return;
+    }
+
+    const skipped = parsed.products.length - newProducts.length;
+    setStatus(
+      `${newProducts.length} product${newProducts.length === 1 ? "" : "s"} added to Patchen.${
+        skipped > 0 ? ` ${skipped} duplicate${skipped === 1 ? "" : "s"} skipped.` : ""
+      } ${nextProducts.length} total saved.`,
+    );
   }
 
   function removeProduct(productId: string) {
@@ -140,7 +159,9 @@ export function ProductPromotionBuilder({ associateTag = "" }: { associateTag?: 
               Paste products into Patchen
             </h2>
             <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
-              One product per line. Use a plain URL, or paste: Title | URL | Description | Image URL | Price | Category.
+              One product per line. Use a plain URL, or paste: Title | URL |
+              Description | Image URL | Price | Category. Copy saved products
+              into PROMOTED_PRODUCTS_JSON in Vercel to publish discreet ads.
             </p>
           </div>
           <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm leading-6 text-amber-900">
@@ -163,7 +184,7 @@ export function ProductPromotionBuilder({ associateTag = "" }: { associateTag?: 
             className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-teal-700 px-4 text-sm font-semibold text-white transition hover:bg-teal-800"
           >
             <Save aria-hidden="true" size={16} />
-            Save to Patchen
+            Add to Patchen
           </button>
           <button
             type="button"
@@ -232,7 +253,7 @@ export function ProductPromotionBuilder({ associateTag = "" }: { associateTag?: 
           <div>
             <h2 className="font-semibold text-slate-950">Saved Patchen drafts</h2>
             <p className="mt-1 text-sm text-slate-500">
-              Saved in this browser for now.
+              Saved in this browser for now. Copy the JSON to publish it as discreet ad placements.
             </p>
           </div>
           {savedProducts.length > 0 ? (
@@ -248,7 +269,7 @@ export function ProductPromotionBuilder({ associateTag = "" }: { associateTag?: 
                 className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border border-slate-200 px-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
               >
                 <Clipboard aria-hidden="true" size={15} />
-                Copy saved JSON
+                Copy ad JSON
               </button>
               <button
                 type="button"

@@ -1,17 +1,21 @@
 "use client";
 
-import { Children, useMemo, useState } from "react";
+import { Children, Fragment, useMemo, useState } from "react";
 import type { ReactNode } from "react";
 import { ChevronDown } from "lucide-react";
 
 type SearchResultsListProps = {
   children: ReactNode;
+  inlineAd?: ReactNode;
+  inlineAdAfter?: number;
   pageSize?: number;
   totalCount: number;
 };
 
 export function SearchResultsList({
   children,
+  inlineAd,
+  inlineAdAfter = 6,
   pageSize = 20,
   totalCount,
 }: SearchResultsListProps) {
@@ -19,11 +23,22 @@ export function SearchResultsList({
   const [visibleCount, setVisibleCount] = useState(pageSize);
   const visibleItems = items.slice(0, visibleCount);
   const canShowMore = visibleCount < items.length;
+  const shouldShowInlineAd = Boolean(inlineAd) && items.length >= 4;
+  const inlineAdIndex = Math.min(inlineAdAfter, visibleItems.length) - 1;
 
   return (
     <div>
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
-        {visibleItems}
+        {visibleItems.map((item, index) => (
+          <Fragment key={`result-${index}`}>
+            {item}
+            {shouldShowInlineAd && index === inlineAdIndex ? (
+              <div className="md:col-span-2 xl:col-span-3 2xl:col-span-4">
+                {inlineAd}
+              </div>
+            ) : null}
+          </Fragment>
+        ))}
       </div>
       {canShowMore ? (
         <div className="mt-6 flex flex-col items-center gap-2">

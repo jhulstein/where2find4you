@@ -20,6 +20,13 @@ type ParseProductOptions = {
   associateTag?: string | null;
 };
 
+type ProductSelectionOptions = {
+  category?: string | null;
+  limit?: number;
+  query?: string | null;
+  tags?: string[];
+};
+
 function isUrl(value: string) {
   return /^https?:\/\//i.test(value.trim());
 }
@@ -198,6 +205,131 @@ export function parsePromotedProducts(input: string, options: ParseProductOption
     });
 
   return { products, warnings };
+}
+
+function stringValue(value: unknown) {
+  return typeof value === "string" && value.trim() ? value.trim() : null;
+}
+
+function optionalString(value: unknown) {
+  return typeof value === "string" && value.trim() ? value.trim() : null;
+}
+
+function productFromJson(value: unknown, index: number): PromotedProduct | null {
+  if (!value || typeof value !== "object") {
+    return null;
+  }
+
+  const candidate = value as Record<string, unknown>;
+  const parsedUrl = safeUrl(stringValue(candidate.url) ?? "");
+
+  if (!parsedUrl) {
+    return null;
+  }
+
+  const source = candidate.source === "external" ? "external" : isAmazonHost(parsedUrl.hostname) ? "amazon" : "external";
+
+  return {
+    affiliateTag: optionalString(candidate.affiliateTag) ?? parsedUrl.searchParams.get("tag"),
+    asin: optionalString(candidate.asin) ?? extractAsin(parsedUrl),
+    category: optionalString(candidate.category),
+    description: optionalString(candidate.description),
+    id: optionalString(candidate.id) ?? productId(parsedUrl, index),
+    imageUrl: optionalString(candidate.imageUrl),
+    price: optionalString(candidate.price),
+    source,
+    title: optionalString(candidate.title) ?? titleFromUrl(parsedUrl),
+    url: parsedUrl.toString(),
+  };
+}
+
+export function parsePromotedProductsJson(input: string | null | undefined) {
+  if (!input?.trim()) {
+    return [];
+  }
+
+  try {
+    const parsed = JSON.parse(input);
+    const products: unknown[] = Array.isArray(parsed)
+      ? parsed
+      : parsed && typeof parsed === "object" && Array.isArray(parsed.products)
+        ? parsed.products
+        : [];
+
+    return products
+      .map((product, index) => productFromJson(product, index))
+      .filter((product: PromotedProduct | null): product is PromotedProduct => Boolean(product));
+  } catch {
+    return [];
+  }
+}
+
+function tokenize(value: string | null | undefined) {
+  return (value ?? "")
+    .toLowerCase()
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, " ")
+    .split(" ")
+    .filter((token) => token.length > 2);
+}
+
+function productText(product: PromotedProduct) {
+  return [
+    product.title,
+    product.description,
+    product.category,
+    product.asin,
+    product.source,
+  ]
+    .filter(Boolean)
+    .join(" ");
+}
+
+export function selectPromotedProducts(
+  products: PromotedProduct[],
+  options: ProductSelectionOptions = {},
+) {
+  const limit = Math.max(0, options.limit ?? 2);
+
+  if (limit === 0 || products.length === 0) {
+    return [];
+  }
+
+  const contextTokens = new Set([
+    ...tokenize(options.query),
+    ...tokenize(options.category),
+    ...(options.tags ?? []).flatMap(tokenize),
+  ]);
+
+  const scored = products.map((product, index) => {
+    const tokens = new Set(tokenize(productText(product)));
+    let score = 0;
+
+    for (const token of contextTokens) {
+      if (tokens.has(token)) {
+        score += 1;
+      }
+    }
+
+    if (options.category && product.category) {
+      const categoryTokens = tokenize(options.category);
+      const productCategoryTokens = new Set(tokenize(product.category));
+
+      if (categoryTokens.some((token) => productCategoryTokens.has(token))) {
+        score += 4;
+      }
+    }
+
+    return { index, product, score };
+  });
+  const hasContextMatch = scored.some((item) => item.score > 0);
+
+  return scored
+    .filter((item) => !hasContextMatch || item.score > 0)
+    .sort((a, b) => b.score - a.score || a.index - b.index)
+    .slice(0, limit)
+    .map((item) => item.product);
 }
 
 export const amazonAffiliateDisclosure =

@@ -3,12 +3,14 @@ import { CategoryFilter } from "@/components/CategoryFilter";
 import { CityPicker } from "@/components/CityPicker";
 import { PlaceCard } from "@/components/PlaceCard";
 import { PlaceMap } from "@/components/PlaceMap";
+import { ProductAdSlot } from "@/components/ProductAdSlot";
 import { ResponsiveContainer } from "@/components/ResponsiveContainer";
 import { SearchBar } from "@/components/SearchBar";
 import { SearchResultsList } from "@/components/SearchResultsList";
 import { SearchSortSelect } from "@/components/SearchSortSelect";
 import { getPlaceAnalytics } from "@/lib/analytics";
 import { cities, popularCities } from "@/lib/data/cities";
+import { getPromotedProductsForContext } from "@/lib/promotedProducts";
 import { searchPlaces } from "@/lib/search/searchService";
 import { searchFilterOptions } from "@/lib/searchFilters";
 import { createSearchRecord, logImpressions } from "@/lib/tracking";
@@ -88,6 +90,11 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
   const cityForSearch = searchResult.city;
   const activeUserLocation = searchResult.userLocationAvailable ? userLocation : null;
   const sorted = searchResult.results;
+  const promotedProducts = getPromotedProductsForContext({
+    category: category === "all" ? null : category,
+    limit: 2,
+    query,
+  });
   const searchRecord = await createSearchRecord({
     query: rawQuery.trim() || "all places",
     normalizedQuery: query,
@@ -237,6 +244,14 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
         {sorted.length > 0 ? (
           <SearchResultsList
             key={`${query}-${category}-${cityForSearch?.slug ?? "all"}-${filters.join(",")}-${sort}`}
+            inlineAd={
+              promotedProducts.length > 0 ? (
+                <ProductAdSlot
+                  products={promotedProducts}
+                  contextLabel="A small recommendation related to this search."
+                />
+              ) : null
+            }
             totalCount={searchResult.totalCount}
           >
             {sorted.map((place, index) => (
