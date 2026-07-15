@@ -12,6 +12,7 @@ import {
 import { ProductAdSlot } from "@/components/ProductAdSlot";
 import {
   amazonAffiliateDisclosure,
+  displayPromotedProductDescription,
   displayPromotedProductTitle,
   parsePromotedProducts,
   type PromotedProduct,
@@ -56,6 +57,10 @@ function updateSavedProducts(products: PromotedProduct[]) {
   window.dispatchEvent(new Event("where2find4you-products-updated"));
 }
 
+function optionalText(value: string) {
+  return value.trim() || null;
+}
+
 function productMergeKey(product: PromotedProduct) {
   return product.asin ?? product.id ?? product.url;
 }
@@ -88,6 +93,91 @@ function ProductThumbnail({ product }: { product: PromotedProduct }) {
   }
 
   return <PackagePlus aria-hidden="true" className="shrink-0 text-teal-700" size={20} />;
+}
+
+type ProductEditorProps = {
+  index: number;
+  onRemove: () => void;
+  onUpdate: (product: PromotedProduct) => void;
+  product: PromotedProduct;
+};
+
+function ProductEditor({ index, onRemove, onUpdate, product }: ProductEditorProps) {
+  function updateField<Key extends keyof PromotedProduct>(
+    key: Key,
+    value: PromotedProduct[Key],
+  ) {
+    onUpdate({ ...product, [key]: value });
+  }
+
+  return (
+    <div className="rounded-lg border border-slate-200 p-3">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div className="flex min-w-0 gap-3">
+          <ProductThumbnail product={product} />
+          <div className="min-w-0">
+            <p className="font-semibold text-slate-950">
+              {displayPromotedProductTitle(product, index)}
+            </p>
+            <p className="truncate text-sm text-slate-500">{product.url}</p>
+          </div>
+        </div>
+        <button
+          type="button"
+          onClick={onRemove}
+          className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border border-slate-200 px-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+        >
+          <Trash2 aria-hidden="true" size={15} />
+          Remove
+        </button>
+      </div>
+
+      <div className="mt-4 grid gap-3 md:grid-cols-2">
+        <label className="grid gap-1 text-sm font-medium text-slate-700">
+          Title
+          <input
+            value={product.title}
+            onChange={(event) => updateField("title", event.target.value)}
+            className="h-10 rounded-lg border border-slate-200 px-3 text-sm font-normal outline-none focus:border-teal-600 focus:ring-4 focus:ring-teal-100"
+          />
+        </label>
+        <label className="grid gap-1 text-sm font-medium text-slate-700">
+          Image URL
+          <input
+            value={product.imageUrl ?? ""}
+            onChange={(event) => updateField("imageUrl", optionalText(event.target.value))}
+            placeholder="https://..."
+            className="h-10 rounded-lg border border-slate-200 px-3 text-sm font-normal outline-none focus:border-teal-600 focus:ring-4 focus:ring-teal-100"
+          />
+        </label>
+        <label className="grid gap-1 text-sm font-medium text-slate-700 md:col-span-2">
+          Description
+          <input
+            value={product.description ?? ""}
+            onChange={(event) => updateField("description", optionalText(event.target.value))}
+            placeholder={displayPromotedProductDescription(product)}
+            className="h-10 rounded-lg border border-slate-200 px-3 text-sm font-normal outline-none focus:border-teal-600 focus:ring-4 focus:ring-teal-100"
+          />
+        </label>
+        <label className="grid gap-1 text-sm font-medium text-slate-700">
+          Price
+          <input
+            value={product.price ?? ""}
+            onChange={(event) => updateField("price", optionalText(event.target.value))}
+            className="h-10 rounded-lg border border-slate-200 px-3 text-sm font-normal outline-none focus:border-teal-600 focus:ring-4 focus:ring-teal-100"
+          />
+        </label>
+        <label className="grid gap-1 text-sm font-medium text-slate-700">
+          Category
+          <input
+            value={product.category ?? ""}
+            onChange={(event) => updateField("category", optionalText(event.target.value))}
+            className="h-10 rounded-lg border border-slate-200 px-3 text-sm font-normal outline-none focus:border-teal-600 focus:ring-4 focus:ring-teal-100"
+          />
+        </label>
+      </div>
+    </div>
+  );
 }
 
 function ProductCard({ index, product }: { index: number; product: PromotedProduct }) {
@@ -188,6 +278,15 @@ export function ProductPromotionBuilder({ associateTag = "" }: { associateTag?: 
   function removeProduct(productId: string) {
     updateSavedProducts(savedProducts.filter((product) => product.id !== productId));
     setStatus("Product removed.");
+  }
+
+  function updateProduct(updatedProduct: PromotedProduct) {
+    updateSavedProducts(
+      savedProducts.map((product) =>
+        product.id === updatedProduct.id ? updatedProduct : product,
+      ),
+    );
+    setStatus("Product details updated.");
   }
 
   return (
@@ -315,7 +414,7 @@ export function ProductPromotionBuilder({ associateTag = "" }: { associateTag?: 
           <div>
             <h2 className="font-semibold text-slate-950">Saved Patchen drafts</h2>
             <p className="mt-1 text-sm text-slate-500">
-              Saved in this browser for now. Copy the JSON to publish it as discreet ad placements.
+              Saved in this browser for now. Edit details here, then copy the JSON to publish.
             </p>
           </div>
           {savedProducts.length > 0 ? (
@@ -351,25 +450,13 @@ export function ProductPromotionBuilder({ associateTag = "" }: { associateTag?: 
         {savedProducts.length > 0 ? (
           <div className="mt-4 grid gap-3">
             {savedProducts.map((product, index) => (
-              <div
+              <ProductEditor
                 key={product.id}
-                className="flex flex-col gap-3 rounded-lg border border-slate-200 p-3 sm:flex-row sm:items-center sm:justify-between"
-              >
-                <div className="min-w-0">
-                  <p className="font-semibold text-slate-950">
-                    {displayPromotedProductTitle(product, index)}
-                  </p>
-                  <p className="truncate text-sm text-slate-500">{product.url}</p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => removeProduct(product.id)}
-                  className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border border-slate-200 px-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
-                >
-                  <Trash2 aria-hidden="true" size={15} />
-                  Remove
-                </button>
-              </div>
+                index={index}
+                onRemove={() => removeProduct(product.id)}
+                onUpdate={updateProduct}
+                product={product}
+              />
             ))}
           </div>
         ) : (

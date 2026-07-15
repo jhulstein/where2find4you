@@ -347,10 +347,8 @@ export function selectPromotedProducts(
 
     return { index, product, score };
   });
-  const hasContextMatch = scored.some((item) => item.score > 0);
 
   return scored
-    .filter((item) => !hasContextMatch || item.score > 0)
     .sort((a, b) => b.score - a.score || a.index - b.index)
     .slice(0, limit)
     .map((item) => item.product);
