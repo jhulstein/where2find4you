@@ -55,21 +55,44 @@ function extractAsin(url: URL) {
   return asinMatch?.[1]?.toUpperCase() ?? null;
 }
 
+function readableTitleFromPath(url: URL) {
+  const parts = url.pathname.split("/").filter(Boolean);
+  const asinIndex = parts.findIndex((part) => /^[A-Z0-9]{10}$/i.test(part));
+  const titlePart =
+    asinIndex > 0
+      ? parts[asinIndex - 1]
+      : parts.find((part) => !/^(dp|gp|product|exec|obidos|asin)$/i.test(part));
+
+  if (
+    !titlePart ||
+    /^[A-Z0-9]{10}$/i.test(titlePart) ||
+    /^(dp|gp|product|exec|obidos|asin)$/i.test(titlePart)
+  ) {
+    return null;
+  }
+
+  const title = titlePart
+    .replace(/[-_]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  return title.length > 2 ? title : null;
+}
+
 function titleFromUrl(url: URL) {
+  const pathTitle = readableTitleFromPath(url);
+
+  if (pathTitle) {
+    return pathTitle;
+  }
+
   const asin = extractAsin(url);
 
   if (asin) {
     return `Amazon product ${asin}`;
   }
 
-  const pathTitle = url.pathname
-    .split("/")
-    .filter(Boolean)
-    .find((part) => !/^[A-Z0-9]{10}$/i.test(part));
-
-  return pathTitle
-    ? pathTitle.replace(/[-_]+/g, " ").trim()
-    : url.hostname.replace(/^www\./, "");
+  return url.hostname.replace(/^www\./, "");
 }
 
 function productId(url: URL, index: number) {
@@ -228,6 +251,7 @@ function productFromJson(value: unknown, index: number): PromotedProduct | null 
   }
 
   const source = candidate.source === "external" ? "external" : isAmazonHost(parsedUrl.hostname) ? "amazon" : "external";
+  const title = optionalString(candidate.title) ?? titleFromUrl(parsedUrl);
 
   return {
     affiliateTag: optionalString(candidate.affiliateTag) ?? parsedUrl.searchParams.get("tag"),
@@ -238,7 +262,7 @@ function productFromJson(value: unknown, index: number): PromotedProduct | null 
     imageUrl: optionalString(candidate.imageUrl),
     price: optionalString(candidate.price),
     source,
-    title: optionalString(candidate.title) ?? titleFromUrl(parsedUrl),
+    title,
     url: parsedUrl.toString(),
   };
 }
@@ -330,6 +354,58 @@ export function selectPromotedProducts(
     .sort((a, b) => b.score - a.score || a.index - b.index)
     .slice(0, limit)
     .map((item) => item.product);
+}
+
+function isAmazonShortCodeTitle(product: PromotedProduct) {
+  try {
+    const url = new URL(product.url);
+
+    return (
+      product.source === "amazon" &&
+      /(^|\.)amzn\./i.test(url.hostname) &&
+      /^[a-z0-9]{5,14}$/i.test(product.title.trim())
+    );
+  } catch {
+    return false;
+  }
+}
+
+function isGenericAmazonTitle(product: PromotedProduct) {
+  return /^amazon product [A-Z0-9]{10}$/i.test(product.title.trim());
+}
+
+export function displayPromotedProductTitle(product: PromotedProduct, index = 0) {
+  try {
+    const url = new URL(product.url);
+    const titleFromProductUrl = titleFromUrl(url);
+    const titleIsGeneric = isGenericAmazonTitle(product) || isAmazonShortCodeTitle(product);
+
+    if (titleIsGeneric && titleFromProductUrl !== product.title) {
+      return titleFromProductUrl;
+    }
+  } catch {
+    // Keep the saved title if the URL is not parseable.
+  }
+
+  if (isAmazonShortCodeTitle(product)) {
+    return product.category ? `Amazon ${product.category} pick` : `Amazon pick ${index + 1}`;
+  }
+
+  return product.title;
+}
+
+export function displayPromotedProductDescription(product: PromotedProduct) {
+  if (product.description) {
+    return product.description;
+  }
+
+  if (product.category) {
+    return `A related ${product.category} recommendation.`;
+  }
+
+  return product.source === "amazon"
+    ? "A related Amazon product recommendation."
+    : "A related product recommendation.";
 }
 
 export const amazonAffiliateDisclosure =

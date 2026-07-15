@@ -9,8 +9,10 @@ import {
   Save,
   Trash2,
 } from "lucide-react";
+import { ProductAdSlot } from "@/components/ProductAdSlot";
 import {
   amazonAffiliateDisclosure,
+  displayPromotedProductTitle,
   parsePromotedProducts,
   type PromotedProduct,
 } from "@/lib/productPromotion";
@@ -58,7 +60,7 @@ function productMergeKey(product: PromotedProduct) {
   return product.asin ?? product.id ?? product.url;
 }
 
-function ProductCard({ product }: { product: PromotedProduct }) {
+function ProductCard({ index, product }: { index: number; product: PromotedProduct }) {
   return (
     <article className="flex h-full flex-col rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
       <div className="flex items-start justify-between gap-3">
@@ -66,7 +68,9 @@ function ProductCard({ product }: { product: PromotedProduct }) {
           <p className="text-xs font-semibold uppercase tracking-wide text-teal-800">
             {product.source === "amazon" ? "Amazon affiliate" : "External product"}
           </p>
-          <h3 className="mt-1 text-base font-semibold text-slate-950">{product.title}</h3>
+          <h3 className="mt-1 text-base font-semibold text-slate-950">
+            {displayPromotedProductTitle(product, index)}
+          </h3>
         </div>
         <PackagePlus aria-hidden="true" className="shrink-0 text-teal-700" size={20} />
       </div>
@@ -108,6 +112,7 @@ export function ProductPromotionBuilder({ associateTag = "" }: { associateTag?: 
     () => parsePromotedProducts(rawProducts, { associateTag }),
     [associateTag, rawProducts],
   );
+  const adPreviewProducts = parsed.products.length > 0 ? parsed.products : savedProducts;
 
   async function copyText(text: string, message: string) {
     if (!("clipboard" in navigator)) {
@@ -241,10 +246,30 @@ export function ProductPromotionBuilder({ associateTag = "" }: { associateTag?: 
             <p className="text-sm text-slate-500">{parsed.products.length} parsed</p>
           </div>
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-            {parsed.products.map((product) => (
-              <ProductCard key={product.id} product={product} />
+            {parsed.products.map((product, index) => (
+              <ProductCard key={product.id} index={index} product={product} />
             ))}
           </div>
+        </section>
+      ) : null}
+
+      {adPreviewProducts.length > 0 ? (
+        <section>
+          <div className="mb-3 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <h2 className="font-semibold text-slate-950">Ad preview</h2>
+              <p className="text-sm text-slate-500">
+                This is how the first picks will look in search results.
+              </p>
+            </div>
+            <p className="text-sm text-slate-500">
+              {Math.min(adPreviewProducts.length, 2)} shown in preview
+            </p>
+          </div>
+          <ProductAdSlot
+            products={adPreviewProducts}
+            contextLabel="Preview only. Publish by copying ad JSON to Vercel."
+          />
         </section>
       ) : null}
 
@@ -288,13 +313,15 @@ export function ProductPromotionBuilder({ associateTag = "" }: { associateTag?: 
 
         {savedProducts.length > 0 ? (
           <div className="mt-4 grid gap-3">
-            {savedProducts.map((product) => (
+            {savedProducts.map((product, index) => (
               <div
                 key={product.id}
                 className="flex flex-col gap-3 rounded-lg border border-slate-200 p-3 sm:flex-row sm:items-center sm:justify-between"
               >
                 <div className="min-w-0">
-                  <p className="font-semibold text-slate-950">{product.title}</p>
+                  <p className="font-semibold text-slate-950">
+                    {displayPromotedProductTitle(product, index)}
+                  </p>
                   <p className="truncate text-sm text-slate-500">{product.url}</p>
                 </div>
                 <button

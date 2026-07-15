@@ -1,6 +1,8 @@
 import { ExternalLink, PackageCheck } from "lucide-react";
 import {
   amazonAffiliateDisclosure,
+  displayPromotedProductDescription,
+  displayPromotedProductTitle,
   type PromotedProduct,
 } from "@/lib/productPromotion";
 
@@ -13,28 +15,6 @@ type ProductAdSlotProps = {
 
 function productMeta(product: PromotedProduct) {
   return [product.category, product.price].filter(Boolean).join(" - ");
-}
-
-function isAmazonShortCodeTitle(product: PromotedProduct) {
-  try {
-    const url = new URL(product.url);
-
-    return (
-      product.source === "amazon" &&
-      /(^|\.)amzn\./i.test(url.hostname) &&
-      /^[a-z0-9]{5,14}$/i.test(product.title.trim())
-    );
-  } catch {
-    return false;
-  }
-}
-
-function productTitle(product: PromotedProduct, index: number) {
-  if (!isAmazonShortCodeTitle(product)) {
-    return product.title;
-  }
-
-  return product.category ? `Amazon ${product.category} pick` : `Amazon pick ${index + 1}`;
 }
 
 export function ProductAdSlot({
@@ -94,10 +74,10 @@ export function ProductAdSlot({
                 {product.source === "amazon" ? "Amazon" : "Partner"}
               </p>
               <h3 className="mt-1 line-clamp-2 text-sm font-semibold leading-5 text-slate-950">
-                {productTitle(product, index)}
+                {displayPromotedProductTitle(product, index)}
               </h3>
               <p className="mt-2 line-clamp-2 text-sm leading-6 text-slate-600">
-                {product.description ?? "A related product recommendation."}
+                {displayPromotedProductDescription(product)}
               </p>
               {productMeta(product) ? (
                 <p className="mt-2 text-xs font-medium text-slate-500">
