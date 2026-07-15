@@ -14,14 +14,14 @@ export async function POST(request: Request) {
   const next = safeNext(formData.get("next"));
 
   if (!configuredPassword) {
-    return NextResponse.redirect(new URL("/admin/login?error=not-configured", request.url));
+    return NextResponse.redirect(new URL("/admin/login?error=not-configured", request.url), 303);
   }
 
   if (password !== configuredPassword) {
-    return NextResponse.redirect(new URL("/admin/login?error=invalid", request.url));
+    return NextResponse.redirect(new URL("/admin/login?error=invalid", request.url), 303);
   }
 
-  const response = NextResponse.redirect(new URL(next, request.url));
+  const response = NextResponse.redirect(new URL(next, request.url), 303);
   response.cookies.set(adminCookieName, await adminSessionValue(), {
     httpOnly: true,
     maxAge: 60 * 60 * 8,
