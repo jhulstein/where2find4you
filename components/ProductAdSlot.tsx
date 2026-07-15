@@ -17,6 +17,24 @@ function productMeta(product: PromotedProduct) {
   return [product.category, product.price].filter(Boolean).join(" - ");
 }
 
+function ProductArtwork({ product }: { product: PromotedProduct }) {
+  if (product.imageUrl) {
+    return (
+      <div
+        aria-hidden="true"
+        className="h-14 w-14 shrink-0 rounded-lg bg-white bg-cover bg-center shadow-sm ring-1 ring-teal-100"
+        style={{ backgroundImage: `url(${product.imageUrl})` }}
+      />
+    );
+  }
+
+  return (
+    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-white text-teal-700 shadow-sm ring-1 ring-teal-100">
+      <PackageCheck aria-hidden="true" size={18} />
+    </div>
+  );
+}
+
 export function ProductAdSlot({
   className = "",
   contextLabel,
@@ -66,9 +84,7 @@ export function ProductAdSlot({
             rel="sponsored noreferrer"
             className="group flex min-h-[96px] items-start gap-3 px-4 py-4 transition hover:bg-white/70"
           >
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-white text-teal-700 shadow-sm ring-1 ring-teal-100">
-              <PackageCheck aria-hidden="true" size={18} />
-            </div>
+            <ProductArtwork product={product} />
             <div className="min-w-0 flex-1">
               <p className="text-xs font-semibold uppercase tracking-wide text-teal-800">
                 {product.source === "amazon" ? "Amazon" : "Partner"}

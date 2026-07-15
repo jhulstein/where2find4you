@@ -60,6 +60,36 @@ function productMergeKey(product: PromotedProduct) {
   return product.asin ?? product.id ?? product.url;
 }
 
+function mergeProducts(primaryProducts: PromotedProduct[], secondaryProducts: PromotedProduct[]) {
+  const seen = new Set<string>();
+  const merged: PromotedProduct[] = [];
+
+  for (const product of [...primaryProducts, ...secondaryProducts]) {
+    const key = productMergeKey(product);
+
+    if (!seen.has(key)) {
+      seen.add(key);
+      merged.push(product);
+    }
+  }
+
+  return merged;
+}
+
+function ProductThumbnail({ product }: { product: PromotedProduct }) {
+  if (product.imageUrl) {
+    return (
+      <div
+        aria-hidden="true"
+        className="h-14 w-14 shrink-0 rounded-lg bg-slate-100 bg-cover bg-center ring-1 ring-slate-200"
+        style={{ backgroundImage: `url(${product.imageUrl})` }}
+      />
+    );
+  }
+
+  return <PackagePlus aria-hidden="true" className="shrink-0 text-teal-700" size={20} />;
+}
+
 function ProductCard({ index, product }: { index: number; product: PromotedProduct }) {
   return (
     <article className="flex h-full flex-col rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
@@ -72,7 +102,7 @@ function ProductCard({ index, product }: { index: number; product: PromotedProdu
             {displayPromotedProductTitle(product, index)}
           </h3>
         </div>
-        <PackagePlus aria-hidden="true" className="shrink-0 text-teal-700" size={20} />
+        <ProductThumbnail product={product} />
       </div>
       {product.description ? (
         <p className="mt-3 text-sm leading-6 text-slate-600">{product.description}</p>
@@ -112,7 +142,13 @@ export function ProductPromotionBuilder({ associateTag = "" }: { associateTag?: 
     () => parsePromotedProducts(rawProducts, { associateTag }),
     [associateTag, rawProducts],
   );
-  const adPreviewProducts = parsed.products.length > 0 ? parsed.products : savedProducts;
+  const adPreviewProducts = useMemo(
+    () =>
+      parsed.products.length > 0
+        ? mergeProducts(parsed.products, savedProducts)
+        : savedProducts,
+    [parsed.products, savedProducts],
+  );
 
   async function copyText(text: string, message: string) {
     if (!("clipboard" in navigator)) {
@@ -167,6 +203,7 @@ export function ProductPromotionBuilder({ associateTag = "" }: { associateTag?: 
               One product per line. Use a plain URL, or paste: Title | URL |
               Description | Image URL | Price | Category. Copy saved products
               into PROMOTED_PRODUCTS_JSON in Vercel to publish discreet ads.
+              Images appear when an Image URL is included.
             </p>
           </div>
           <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm leading-6 text-amber-900">
@@ -259,7 +296,7 @@ export function ProductPromotionBuilder({ associateTag = "" }: { associateTag?: 
             <div>
               <h2 className="font-semibold text-slate-950">Ad preview</h2>
               <p className="text-sm text-slate-500">
-                This is how the first picks will look in search results.
+                This is how the first picks will look in search results. New pasted products are previewed with saved drafts.
               </p>
             </div>
             <p className="text-sm text-slate-500">
