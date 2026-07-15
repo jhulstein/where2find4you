@@ -58,10 +58,13 @@ function extractAsin(url: URL) {
 function readableTitleFromPath(url: URL) {
   const parts = url.pathname.split("/").filter(Boolean);
   const asinIndex = parts.findIndex((part) => /^[A-Z0-9]{10}$/i.test(part));
+  const previousPart = asinIndex > 0 ? parts[asinIndex - 1] : null;
   const titlePart =
-    asinIndex > 0
-      ? parts[asinIndex - 1]
-      : parts.find((part) => !/^(dp|gp|product|exec|obidos|asin)$/i.test(part));
+    previousPart && /^(dp|product|asin)$/i.test(previousPart) && asinIndex > 1
+      ? parts[asinIndex - 2]
+      : asinIndex > 0
+        ? previousPart
+        : parts.find((part) => !/^(dp|gp|product|exec|obidos|asin)$/i.test(part));
 
   if (
     !titlePart ||
@@ -238,6 +241,10 @@ function optionalString(value: unknown) {
   return typeof value === "string" && value.trim() ? value.trim() : null;
 }
 
+function isGenericAmazonTitleValue(value: string) {
+  return /^amazon product [A-Z0-9]{10}$/i.test(value.trim());
+}
+
 function productFromJson(value: unknown, index: number): PromotedProduct | null {
   if (!value || typeof value !== "object") {
     return null;
@@ -251,7 +258,10 @@ function productFromJson(value: unknown, index: number): PromotedProduct | null 
   }
 
   const source = candidate.source === "external" ? "external" : isAmazonHost(parsedUrl.hostname) ? "amazon" : "external";
-  const title = optionalString(candidate.title) ?? titleFromUrl(parsedUrl);
+  const savedTitle = optionalString(candidate.title);
+  const urlTitle = titleFromUrl(parsedUrl);
+  const title =
+    savedTitle && !isGenericAmazonTitleValue(savedTitle) ? savedTitle : urlTitle;
 
   return {
     affiliateTag: optionalString(candidate.affiliateTag) ?? parsedUrl.searchParams.get("tag"),
@@ -369,7 +379,7 @@ function isAmazonShortCodeTitle(product: PromotedProduct) {
 }
 
 function isGenericAmazonTitle(product: PromotedProduct) {
-  return /^amazon product [A-Z0-9]{10}$/i.test(product.title.trim());
+  return isGenericAmazonTitleValue(product.title);
 }
 
 export function displayPromotedProductTitle(product: PromotedProduct, index = 0) {

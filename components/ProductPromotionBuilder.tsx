@@ -302,7 +302,8 @@ export function ProductPromotionBuilder({ associateTag = "" }: { associateTag?: 
               One product per line. Use a plain URL, or paste: Title | URL |
               Description | Image URL | Price | Category. Copy saved products
               into PROMOTED_PRODUCTS_JSON in Vercel to publish discreet ads.
-              Images appear when an Image URL is included.
+              Full Amazon URLs can auto-fill readable titles. Images appear
+              when an Image URL is included.
             </p>
           </div>
           <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm leading-6 text-amber-900">

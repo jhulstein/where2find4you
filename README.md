@@ -162,12 +162,14 @@ password. Normal public navigation does not show admin links. If
 Patchen at `/admin/products` accepts one product per line.
 Use a plain URL, or paste `Title | URL | Description | Image URL | Price |
 Category`. Amazon links get `NEXT_PUBLIC_AMAZON_ASSOCIATE_TAG` added when it is
-configured and no `tag=` parameter exists. The MVP keeps saved product drafts in
-the admin browser's local storage; copy the generated JSON when you are ready to
-publish the list. Put the copied JSON in `PROMOTED_PRODUCTS_JSON` in Vercel and
-redeploy. Product ads are shown as small affiliate recommendation slots after a
-few search results and in the side column on place pages. Keep the visible
-affiliate disclosure on pages that use affiliate links.
+configured and no `tag=` parameter exists. Full Amazon URLs can auto-fill a
+readable title from the URL path, but product images require an Image URL or a
+future Amazon Product Advertising API integration. The MVP keeps saved product
+drafts in the admin browser's local storage; copy the generated JSON when you
+are ready to publish the list. Put the copied JSON in `PROMOTED_PRODUCTS_JSON`
+in Vercel and redeploy. Product ads are shown as small affiliate recommendation
+slots after a few search results and in the side column on place pages. Keep the
+visible affiliate disclosure on pages that use affiliate links.
 
 ## API Routes
 
