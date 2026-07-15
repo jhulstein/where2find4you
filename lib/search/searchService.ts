@@ -444,8 +444,12 @@ export async function searchPlaces(input: SearchServiceInput = {}): Promise<Sear
     const shouldBroaden =
       isBroadIntentSearch(normalizedQuery) &&
       typesenseResult.totalCount < Math.min(4, pageSize);
+    const shouldTryFallback =
+      typesenseResult.totalCount === 0 &&
+      input.includeOsmFallback !== false &&
+      Boolean(city || effectiveUserLocation);
 
-    if (!shouldBroaden) {
+    if (!shouldBroaden && !shouldTryFallback) {
       return typesenseResult;
     }
 

@@ -125,6 +125,22 @@ export const cities: City[] = [
 
 export const popularCities = cities.slice(0, 6);
 
+const citySearchAliases: Record<string, string[]> = {
+  oslo: [
+    "Aker Brygge",
+    "Barcode",
+    "Bjorvika",
+    "Bjørvika",
+    "Grunerlokka",
+    "Grünerløkka",
+    "Sorenga",
+    "Sorengkaia",
+    "Sørenga",
+    "Sørengkaia",
+    "Tjuvholmen",
+  ],
+};
+
 export function normalizeLocation(value: string) {
   return value
     .trim()
@@ -142,19 +158,29 @@ export function getCityBySearchTerm(value?: string | null) {
 
   const normalized = normalizeLocation(value);
 
-  return (
-    cities.find((city) => {
-      const cityName = normalizeLocation(city.name);
-      const country = normalizeLocation(city.country);
+  const directCity = cities.find((city) => {
+    const cityName = normalizeLocation(city.name);
+    const country = normalizeLocation(city.country);
 
-      return (
-        normalized === city.slug ||
-        normalized === cityName ||
-        normalized.includes(city.slug) ||
-        normalized.includes(cityName) ||
-        normalized.includes(country)
-      );
-    }) ?? null
+    return (
+      normalized === city.slug ||
+      normalized === cityName ||
+      normalized.includes(city.slug) ||
+      normalized.includes(cityName) ||
+      normalized.includes(country)
+    );
+  });
+
+  if (directCity) {
+    return directCity;
+  }
+
+  return (
+    cities.find((city) =>
+      citySearchAliases[city.slug]?.some((alias) =>
+        normalized.includes(normalizeLocation(alias)),
+      ),
+    ) ?? null
   );
 }
 
