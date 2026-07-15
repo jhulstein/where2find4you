@@ -10,6 +10,20 @@ type OsmElement = {
   type: string;
 };
 
+type NominatimPlace = {
+  address?: Record<string, string | undefined>;
+  category?: string;
+  display_name?: string;
+  extratags?: Record<string, string | undefined>;
+  lat?: string;
+  lon?: string;
+  name?: string;
+  osm_id?: number;
+  osm_type?: string;
+  place_id: number;
+  type?: string;
+};
+
 type OsmSearchInput = {
   category: SearchFilterId;
   city: City | null;
@@ -25,7 +39,9 @@ type NormalizedOsmSearchInput = Omit<OsmSearchInput, "city" | "limit"> & {
 };
 
 const overpassEndpoint = "https://overpass-api.de/api/interpreter";
+const nominatimSearchEndpoint = "https://nominatim.openstreetmap.org/search";
 const osmSearchTimeoutMs = 12000;
+const nominatimSearchTimeoutMs = 8000;
 
 const categorySelectors: Record<PlaceCategory, string[]> = {
   restaurants: [
@@ -54,6 +70,46 @@ function normalize(value: string) {
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
     .replace(/wi[\s-]?fi/g, "wifi");
+}
+
+const namedSearchStopTerms = new Set([
+  "around",
+  "bar",
+  "bars",
+  "best",
+  "cafe",
+  "cafes",
+  "dining",
+  "find",
+  "food",
+  "in",
+  "me",
+  "near",
+  "nearby",
+  "open",
+  "quiet",
+  "restaurant",
+  "restaurants",
+  "romantic",
+  "show",
+  "the",
+  "things",
+  "to",
+  "waterfront",
+  "wifi",
+  "with",
+]);
+
+function namedSearchTerms(query: string) {
+  return normalize(query)
+    .replace(/[^\p{L}0-9]+/gu, " ")
+    .split(" ")
+    .map((term) => term.trim())
+    .filter((term) => term.length >= 3 && !namedSearchStopTerms.has(term));
+}
+
+function shouldSearchNamedPlace(input: NormalizedOsmSearchInput) {
+  return input.query.trim().length >= 3 && namedSearchTerms(input.query).length > 0;
 }
 
 function selectorsFor(input: OsmSearchInput) {
@@ -173,6 +229,70 @@ function addressFrom(tags: Record<string, string>) {
   return [streetLine || namedPlace, streetLine ? postcode : null].filter(Boolean).join(", ");
 }
 
+function compactAddressParts(parts: Array<string | null | undefined>) {
+  const seen = new Set<string>();
+
+  return parts
+    .map((part) => part?.trim())
+    .filter((part): part is string => Boolean(part))
+    .filter((part) => {
+      const normalized = normalize(part);
+
+      if (!normalized || seen.has(normalized)) {
+        return false;
+      }
+
+      seen.add(normalized);
+      return true;
+    })
+    .join(", ");
+}
+
+function cityFromNominatimAddress(address: NominatimPlace["address"]) {
+  return (
+    address?.city ??
+    address?.town ??
+    address?.village ??
+    address?.municipality ??
+    address?.county ??
+    null
+  );
+}
+
+function addressFromNominatim(result: NominatimPlace) {
+  const address = result.address;
+
+  if (!address) {
+    return result.display_name ?? "";
+  }
+
+  const street = [
+    address.road ??
+      address.pedestrian ??
+      address.footway ??
+      address.path ??
+      address.cycleway ??
+      null,
+    address.house_number,
+  ]
+    .filter(Boolean)
+    .join(" ");
+  const place =
+    street ||
+    address.amenity ||
+    address.tourism ||
+    address.shop ||
+    address.neighbourhood ||
+    address.suburb ||
+    address.city_district ||
+    null;
+  const postcodeAndCity = [address.postcode, cityFromNominatimAddress(address)]
+    .filter(Boolean)
+    .join(" ");
+
+  return compactAddressParts([place, postcodeAndCity, address.country]);
+}
+
 function slugify(value: string) {
   return normalize(value)
     .replace(/[^a-z0-9]+/g, "-")
@@ -201,6 +321,53 @@ function buildSelectorQuery(
     .join("");
 
   return `[out:json][timeout:14];(${body});out center ${limit};`;
+}
+
+function searchRadiusKm(input: NormalizedOsmSearchInput) {
+  if (input.radiusKm) {
+    return Math.max(0.1, Math.min(input.radiusKm, 100));
+  }
+
+  return input.category === "all" ? 3.5 : 5.5;
+}
+
+function distanceKm(first: { latitude: number; longitude: number }, second: { latitude: number; longitude: number }) {
+  const toRadians = (value: number) => (value * Math.PI) / 180;
+  const earthRadiusKm = 6371;
+  const latitudeDistance = toRadians(second.latitude - first.latitude);
+  const longitudeDistance = toRadians(second.longitude - first.longitude);
+  const firstLatitude = toRadians(first.latitude);
+  const secondLatitude = toRadians(second.latitude);
+  const a =
+    Math.sin(latitudeDistance / 2) ** 2 +
+    Math.cos(firstLatitude) *
+      Math.cos(secondLatitude) *
+      Math.sin(longitudeDistance / 2) ** 2;
+
+  return earthRadiusKm * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+function placeMergeKey(place: Place) {
+  return `${place.name.toLowerCase()}-${place.latitude.toFixed(5)}-${place.longitude.toFixed(5)}`;
+}
+
+function nominatimTags(result: NominatimPlace) {
+  const tags: Record<string, string> = {};
+
+  for (const [key, value] of Object.entries(result.extratags ?? {})) {
+    if (value) {
+      tags[key] = value;
+    }
+  }
+
+  if (result.category && result.type) {
+    if (result.category === "amenity") tags.amenity = tags.amenity ?? result.type;
+    if (result.category === "leisure") tags.leisure = tags.leisure ?? result.type;
+    if (result.category === "shop") tags.shop = tags.shop ?? result.type;
+    if (result.category === "tourism") tags.tourism = tags.tourism ?? result.type;
+  }
+
+  return tags;
 }
 
 function toPlace(element: OsmElement, input: NormalizedOsmSearchInput): Place | null {
@@ -258,6 +425,118 @@ function toPlace(element: OsmElement, input: NormalizedOsmSearchInput): Place | 
   };
 }
 
+function toPlaceFromNominatim(result: NominatimPlace, input: NormalizedOsmSearchInput): Place | null {
+  const latitude = Number(result.lat);
+  const longitude = Number(result.lon);
+
+  if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
+    return null;
+  }
+
+  const maxDistanceKm = input.radiusKm ? searchRadiusKm(input) : 15;
+  const distanceFromSearchCenter = distanceKm(
+    { latitude, longitude },
+    { latitude: input.city.latitude, longitude: input.city.longitude },
+  );
+
+  if (distanceFromSearchCenter > maxDistanceKm) {
+    return null;
+  }
+
+  const name =
+    result.name?.trim() ||
+    result.address?.amenity?.trim() ||
+    result.display_name?.split(",")[0]?.trim();
+
+  if (!name) {
+    return null;
+  }
+
+  const tags = nominatimTags(result);
+  const category = categoryFor(tags, input.category);
+  const osmType = result.osm_type?.toLowerCase();
+  const sourceId =
+    osmType && result.osm_id
+      ? `${osmType}/${result.osm_id}`
+      : `nominatim/${result.place_id}`;
+  const id =
+    osmType && result.osm_id
+      ? `osm-${osmType}-${result.osm_id}`
+      : `osm-nominatim-${result.place_id}`;
+
+  return {
+    id,
+    name,
+    slug: `osm-${slugify(name)}-${result.osm_id ?? result.place_id}`,
+    category,
+    description: `${name} is an OpenStreetMap place in ${input.city.name}.`,
+    shortDescription:
+      tags.cuisine ? `${tags.cuisine} place` : `${category.replace("-", " ")} from OpenStreetMap.`,
+    address: addressFromNominatim(result),
+    city: cityFromNominatimAddress(result.address) ?? input.city.name,
+    country: result.address?.country ?? input.city.country,
+    latitude,
+    longitude,
+    websiteUrl: tags.website ?? tags["contact:website"] ?? null,
+    phone: tags.phone ?? tags["contact:phone"] ?? null,
+    email: tags.email ?? tags["contact:email"] ?? null,
+    imageUrl: null,
+    source: "openstreetmap",
+    sourceId,
+    tags: tagList(tags, category, input.category, input.query),
+    sponsored: false,
+    isSponsored: false,
+    sponsoredPriority: 0,
+    isActive: true,
+    rating: null,
+    openingHours: tags.opening_hours ?? "Hours not provided",
+    createdAt: new Date(0).toISOString(),
+    updatedAt: new Date(0).toISOString(),
+  };
+}
+
+async function searchNamedOsmPlaces(input: NormalizedOsmSearchInput): Promise<Place[]> {
+  if (!shouldSearchNamedPlace(input)) {
+    return [];
+  }
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), nominatimSearchTimeoutMs);
+  const cityQuery = input.city.id === "near-me" ? "" : `${input.city.name} ${input.city.country}`;
+  const searchParams = new URLSearchParams({
+    addressdetails: "1",
+    extratags: "1",
+    format: "jsonv2",
+    limit: String(Math.min(input.limit, 8)),
+    q: [input.query, cityQuery].filter(Boolean).join(" "),
+  });
+
+  try {
+    const response = await fetch(`${nominatimSearchEndpoint}?${searchParams.toString()}`, {
+      headers: {
+        accept: "application/json",
+        "user-agent": "where2find4you-web/1.0",
+      },
+      next: { revalidate: 3600 },
+      signal: controller.signal,
+    });
+
+    if (!response.ok) {
+      return [];
+    }
+
+    const data = (await response.json()) as NominatimPlace[];
+
+    return data
+      .map((result) => toPlaceFromNominatim(result, input))
+      .filter((place): place is Place => Boolean(place));
+  } catch {
+    return [];
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
 export async function searchOsmPlaces(input: OsmSearchInput): Promise<Place[]> {
   if (!input.city) {
     return [];
@@ -269,6 +548,7 @@ export async function searchOsmPlaces(input: OsmSearchInput): Promise<Place[]> {
     limit: input.limit ?? 28,
   };
   const selectors = selectorsFor(normalizedInput).slice(0, 8);
+  const namedPlaces = await searchNamedOsmPlaces(normalizedInput);
 
   async function fetchElements(query: string) {
     const controller = new AbortController();
@@ -317,19 +597,32 @@ export async function searchOsmPlaces(input: OsmSearchInput): Promise<Place[]> {
     elements = splitElements.flat();
   }
 
-  const seen = new Set<string>();
+  const overpassSeen = new Set<string>();
 
-  return elements
+  const overpassPlaces = elements
     .map((element) => toPlace(element, normalizedInput))
     .filter((place): place is Place => Boolean(place))
     .filter((place) => {
-      const key = `${place.name.toLowerCase()}-${place.latitude.toFixed(5)}-${place.longitude.toFixed(5)}`;
+      const key = placeMergeKey(place);
 
-      if (seen.has(key)) {
+      if (overpassSeen.has(key)) {
         return false;
       }
 
-      seen.add(key);
+      overpassSeen.add(key);
+      return true;
+    });
+  const combinedSeen = new Set<string>();
+
+  return [...namedPlaces, ...overpassPlaces]
+    .filter((place) => {
+      const key = placeMergeKey(place);
+
+      if (combinedSeen.has(key)) {
+        return false;
+      }
+
+      combinedSeen.add(key);
       return true;
     })
     .slice(0, normalizedInput.limit);
