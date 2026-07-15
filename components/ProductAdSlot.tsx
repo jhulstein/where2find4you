@@ -15,6 +15,28 @@ function productMeta(product: PromotedProduct) {
   return [product.category, product.price].filter(Boolean).join(" - ");
 }
 
+function isAmazonShortCodeTitle(product: PromotedProduct) {
+  try {
+    const url = new URL(product.url);
+
+    return (
+      product.source === "amazon" &&
+      /(^|\.)amzn\./i.test(url.hostname) &&
+      /^[a-z0-9]{5,14}$/i.test(product.title.trim())
+    );
+  } catch {
+    return false;
+  }
+}
+
+function productTitle(product: PromotedProduct, index: number) {
+  if (!isAmazonShortCodeTitle(product)) {
+    return product.title;
+  }
+
+  return product.category ? `Amazon ${product.category} pick` : `Amazon pick ${index + 1}`;
+}
+
 export function ProductAdSlot({
   className = "",
   contextLabel,
@@ -24,8 +46,8 @@ export function ProductAdSlot({
   const visibleProducts = products.slice(0, variant === "aside" ? 1 : 2);
   const productGridClassName =
     visibleProducts.length > 1
-      ? "mt-4 grid gap-4 border-t border-slate-100 pt-3 sm:grid-cols-2"
-      : "mt-4 grid gap-4 border-t border-slate-100 pt-3";
+      ? "grid divide-y divide-teal-100 sm:grid-cols-2 sm:divide-x sm:divide-y-0"
+      : "grid divide-y divide-teal-100";
 
   if (visibleProducts.length === 0) {
     return null;
@@ -34,64 +56,64 @@ export function ProductAdSlot({
   return (
     <aside
       aria-label="Affiliate recommendations"
-      className={`rounded-xl border border-slate-200 bg-white p-4 shadow-sm ${className}`}
+      className={`overflow-hidden rounded-xl border border-teal-200 bg-teal-50 shadow-sm ${className}`}
     >
-      <div className="flex flex-wrap items-start justify-between gap-3">
+      <div className="flex flex-wrap items-start justify-between gap-3 border-b border-teal-100 bg-white px-4 py-3">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-wide text-teal-800">
-            Affiliate recommendation
-          </p>
-          <h2 className="mt-1 text-base font-semibold text-slate-950">
-            {variant === "aside" ? "Helpful product pick" : "Relevant product picks"}
-          </h2>
+          <div className="flex flex-wrap items-center gap-2">
+            <p className="text-xs font-semibold uppercase tracking-wide text-teal-800">
+              Sponsored picks
+            </p>
+            <span className="rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[11px] font-semibold uppercase text-amber-800">
+              Affiliate
+            </span>
+          </div>
           {contextLabel ? (
             <p className="mt-1 text-sm text-slate-500">{contextLabel}</p>
           ) : null}
         </div>
-        <div className="rounded-lg bg-slate-50 p-2 text-teal-700">
+        <div className="rounded-full bg-teal-700 p-2 text-white">
           <PackageCheck aria-hidden="true" size={18} />
         </div>
       </div>
 
       <div className={productGridClassName}>
-        {visibleProducts.map((product) => (
+        {visibleProducts.map((product, index) => (
           <a
             key={product.id}
             href={product.url}
             target="_blank"
             rel="sponsored noreferrer"
-            className="group block transition hover:text-teal-800"
+            className="group flex min-h-[96px] items-start gap-3 px-4 py-4 transition hover:bg-white/70"
           >
-            <div className="flex items-start justify-between gap-3">
-              <div className="min-w-0">
-                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                  {product.source === "amazon" ? "Amazon" : "Partner"}
-                </p>
-                <h3 className="mt-1 line-clamp-2 text-sm font-semibold leading-5 text-slate-950">
-                  {product.title}
-                </h3>
-              </div>
-              <ExternalLink
-                aria-hidden="true"
-                className="shrink-0 text-slate-400 transition group-hover:text-teal-700"
-                size={15}
-              />
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-white text-teal-700 shadow-sm ring-1 ring-teal-100">
+              <PackageCheck aria-hidden="true" size={18} />
             </div>
-            {product.description ? (
+            <div className="min-w-0 flex-1">
+              <p className="text-xs font-semibold uppercase tracking-wide text-teal-800">
+                {product.source === "amazon" ? "Amazon" : "Partner"}
+              </p>
+              <h3 className="mt-1 line-clamp-2 text-sm font-semibold leading-5 text-slate-950">
+                {productTitle(product, index)}
+              </h3>
               <p className="mt-2 line-clamp-2 text-sm leading-6 text-slate-600">
-                {product.description}
+                {product.description ?? "A related product recommendation."}
               </p>
-            ) : null}
-            {productMeta(product) ? (
-              <p className="mt-2 text-xs font-medium text-slate-500">
-                {productMeta(product)}
-              </p>
-            ) : null}
+              {productMeta(product) ? (
+                <p className="mt-2 text-xs font-medium text-slate-500">
+                  {productMeta(product)}
+                </p>
+              ) : null}
+              <span className="mt-3 inline-flex items-center gap-1.5 text-xs font-semibold text-teal-800 transition group-hover:text-teal-950">
+                View product
+                <ExternalLink aria-hidden="true" size={13} />
+              </span>
+            </div>
           </a>
         ))}
       </div>
 
-      <p className="mt-3 text-xs leading-5 text-slate-500">
+      <p className="border-t border-teal-100 bg-white/70 px-4 py-3 text-xs leading-5 text-slate-500">
         {amazonAffiliateDisclosure}
       </p>
     </aside>
