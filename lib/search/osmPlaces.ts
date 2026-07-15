@@ -38,7 +38,11 @@ type NormalizedOsmSearchInput = Omit<OsmSearchInput, "city" | "limit"> & {
   limit: number;
 };
 
-const overpassEndpoint = "https://overpass-api.de/api/interpreter";
+const overpassEndpoints = [
+  "https://overpass-api.de/api/interpreter",
+  "https://overpass.kumi.systems/api/interpreter",
+  "https://overpass.openstreetmap.fr/api/interpreter",
+];
 const nominatimSearchEndpoint = "https://nominatim.openstreetmap.org/search";
 const osmSearchTimeoutMs = 12000;
 const nominatimSearchTimeoutMs = 8000;
@@ -55,14 +59,50 @@ const categorySelectors: Record<PlaceCategory, string[]> = {
   cafes: ['amenity="cafe"'],
   hotels: ['tourism="hotel"'],
   attractions: ['tourism="attraction"', 'tourism="viewpoint"'],
-  activities: ['leisure="sports_centre"', 'tourism="theme_park"', 'tourism="attraction"'],
+  activities: [
+    'amenity="cinema"',
+    'amenity="theatre"',
+    'leisure="playground"',
+    'leisure="sports_centre"',
+    'tourism="theme_park"',
+    'tourism="attraction"',
+  ],
   shops: ["shop"],
   marinas: ['leisure="marina"'],
   bars: ['amenity="bar"', 'amenity="pub"'],
   museums: ['tourism="museum"'],
   parks: ['leisure="park"', 'boundary="national_park"'],
-  "local-services": ['amenity="bicycle_rental"', 'tourism="information"', 'amenity="post_office"'],
+  "local-services": [
+    'amenity="atm"',
+    'amenity="bank"',
+    'amenity="bicycle_rental"',
+    'amenity="charging_station"',
+    'amenity="clinic"',
+    'amenity="fuel"',
+    'amenity="library"',
+    'amenity="pharmacy"',
+    'amenity="post_office"',
+    'tourism="information"',
+  ],
 };
+
+const broadDiscoveryCategories: PlaceCategory[] = [
+  "restaurants",
+  "cafes",
+  "bars",
+  "shops",
+  "museums",
+  "parks",
+  "attractions",
+  "activities",
+  "marinas",
+  "local-services",
+  "hotels",
+];
+
+function uniqueSelectors(selectors: string[]) {
+  return Array.from(new Set(selectors));
+}
 
 function normalize(value: string) {
   return value
@@ -161,20 +201,19 @@ function selectorsFor(input: OsmSearchInput) {
   }
 
   if (normalizedQuery.includes("things to do") || normalizedQuery.includes("experience")) {
-    return [
+    return uniqueSelectors([
       ...categorySelectors.attractions,
       ...categorySelectors.activities,
       ...categorySelectors.museums,
       ...categorySelectors.parks,
-    ];
+      ...categorySelectors.shops,
+      ...categorySelectors.restaurants,
+    ]);
   }
 
-  return [
-    ...categorySelectors.restaurants,
-    ...categorySelectors.cafes,
-    ...categorySelectors.hotels,
-    ...categorySelectors.attractions,
-  ];
+  return uniqueSelectors(
+    broadDiscoveryCategories.flatMap((category) => categorySelectors[category]),
+  );
 }
 
 function categoryFor(tags: Record<string, string>, fallback: SearchFilterId): PlaceCategory {
@@ -187,7 +226,29 @@ function categoryFor(tags: Record<string, string>, fallback: SearchFilterId): Pl
   if (tags.tourism === "museum") return "museums";
   if (tags.leisure === "park" || tags.boundary === "national_park") return "parks";
   if (tags.shop) return "shops";
-  if (tags.amenity === "bicycle_rental" || tags.tourism === "information") return "local-services";
+  if (
+    [
+      "atm",
+      "bank",
+      "bicycle_rental",
+      "charging_station",
+      "clinic",
+      "fuel",
+      "library",
+      "pharmacy",
+      "post_office",
+    ].includes(tags.amenity ?? "") ||
+    tags.tourism === "information"
+  ) {
+    return "local-services";
+  }
+  if (
+    ["cinema", "theatre"].includes(tags.amenity ?? "") ||
+    ["playground", "sports_centre"].includes(tags.leisure ?? "") ||
+    tags.tourism === "theme_park"
+  ) {
+    return "activities";
+  }
   if (tags.tourism || tags.leisure) return "attractions";
 
   return fallback !== "all" && fallback !== "free-wifi" && fallback !== "rooftops"
@@ -303,6 +364,7 @@ function selectorQuery(selector: string, radiusMeters: number, city: City) {
   return [
     `node[${selector}](around:${radiusMeters},${city.latitude},${city.longitude});`,
     `way[${selector}](around:${radiusMeters},${city.latitude},${city.longitude});`,
+    `relation[${selector}](around:${radiusMeters},${city.latitude},${city.longitude});`,
   ].join("");
 }
 
@@ -547,15 +609,15 @@ export async function searchOsmPlaces(input: OsmSearchInput): Promise<Place[]> {
     city: input.city,
     limit: input.limit ?? 28,
   };
-  const selectors = selectorsFor(normalizedInput).slice(0, 8);
+  const selectors = selectorsFor(normalizedInput);
   const namedPlaces = await searchNamedOsmPlaces(normalizedInput);
 
-  async function fetchElements(query: string) {
+  async function fetchElementsFromEndpoint(endpoint: string, query: string) {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), osmSearchTimeoutMs);
 
     try {
-      const response = await fetch(overpassEndpoint, {
+      const response = await fetch(endpoint, {
         body: new URLSearchParams({ data: query }),
         headers: {
           accept: "application/json",
@@ -568,28 +630,41 @@ export async function searchOsmPlaces(input: OsmSearchInput): Promise<Place[]> {
       });
 
       if (!response.ok) {
-        return [];
+        return null;
       }
 
       const data = (await response.json()) as { elements?: OsmElement[] };
       return data.elements ?? [];
     } catch {
-      return [];
+      return null;
     } finally {
       clearTimeout(timeout);
     }
+  }
+
+  async function fetchElements(query: string) {
+    for (const endpoint of overpassEndpoints) {
+      const elements = await fetchElementsFromEndpoint(endpoint, query);
+
+      if (elements !== null) {
+        return elements;
+      }
+    }
+
+    return [];
   }
 
   const combinedQuery = buildSelectorQuery(normalizedInput, selectors, normalizedInput.limit);
   let elements = await fetchElements(combinedQuery);
 
   if (elements.length === 0 && selectors.length > 1) {
+    const fallbackSelectorCount = normalizedInput.category === "all" ? 14 : 6;
     const perSelectorLimit = Math.max(
       20,
-      Math.ceil(normalizedInput.limit / Math.min(selectors.length, 6)),
+      Math.ceil(normalizedInput.limit / Math.min(selectors.length, fallbackSelectorCount)),
     );
     const splitElements = await Promise.all(
-      selectors.slice(0, 6).map((selector) =>
+      selectors.slice(0, fallbackSelectorCount).map((selector) =>
         fetchElements(buildSelectorQuery(normalizedInput, [selector], perSelectorLimit)),
       ),
     );
