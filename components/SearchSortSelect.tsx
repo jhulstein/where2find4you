@@ -10,6 +10,8 @@ type SearchSortSelectProps = {
   latitude?: number | null;
   location?: string | null;
   longitude?: number | null;
+  query?: string;
+  radiusKm?: number | null;
   sort: string;
 };
 
@@ -19,6 +21,8 @@ export function SearchSortSelect({
   latitude = null,
   location = null,
   longitude = null,
+  query = "",
+  radiusKm = null,
   sort,
 }: SearchSortSelectProps) {
   const router = useRouter();
@@ -41,6 +45,12 @@ export function SearchSortSelect({
     } else if (Number.isFinite(latitude) && Number.isFinite(longitude)) {
       searchParams.set("lat", String(latitude));
       searchParams.set("lon", String(longitude));
+      if (Number.isFinite(radiusKm)) {
+        searchParams.set("radius", String(radiusKm));
+      }
+    }
+    if (query) {
+      searchParams.set("q", query);
     }
     searchParams.set("sort", nextSort);
 

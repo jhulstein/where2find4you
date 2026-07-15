@@ -6,6 +6,7 @@ import type { City, Place, PlaceScore } from "@/lib/types";
 export type PlaceMapProps = {
   places: Place[];
   city?: City;
+  defaultLocateRadiusKm?: number | null;
   scores?: PlaceScore[];
   heightClassName?: string;
   initialUserLocation?: { latitude: number; longitude: number } | null;
@@ -28,6 +29,7 @@ const LeafletMap = dynamic(() => import("@/components/LeafletMap"), {
 export function PlaceMap({
   places,
   city,
+  defaultLocateRadiusKm = null,
   scores = [],
   heightClassName = "h-[420px]",
   initialUserLocation = null,
@@ -54,6 +56,7 @@ export function PlaceMap({
       <div className={heightClassName}>
         <LeafletMap
           city={city}
+          defaultLocateRadiusKm={defaultLocateRadiusKm}
           key={mapKey}
           initialUserLocation={initialUserLocation}
           places={places}

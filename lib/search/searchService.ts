@@ -165,7 +165,7 @@ function radiusFor(input: SearchServiceInput) {
     return DEFAULT_SEARCH_RADIUS_KM;
   }
 
-  return Math.max(1, Math.min(Math.trunc(requested ?? DEFAULT_SEARCH_RADIUS_KM), 100));
+  return Math.max(0.1, Math.min(Number(requested ?? DEFAULT_SEARCH_RADIUS_KM), 100));
 }
 
 function findSearchCity(input: SearchServiceInput, normalizedQuery: string, category: SearchFilterId) {
@@ -304,7 +304,13 @@ async function searchFallbackPlaces(input: SearchServiceInput & {
   const osmSearchCity = city ?? cityFromUserLocation(input.userLocation);
   const shouldFetchOsmPlaces =
     input.includeOsmFallback !== false &&
-    Boolean(osmSearchCity && (normalizedQuery || category !== "all" || filters.length > 0)) &&
+    Boolean(
+      osmSearchCity &&
+        (normalizedQuery ||
+          category !== "all" ||
+          filters.length > 0 ||
+          Boolean(input.userLocation)),
+    ) &&
     (!usesDatabase || databasePlaces.length < Math.max(8, pageSize));
   const osmPlaces = shouldFetchOsmPlaces
     ? mergePlaces(

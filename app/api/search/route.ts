@@ -11,6 +11,13 @@ export async function GET(request: Request) {
     Number.isFinite(userLatitude) && Number.isFinite(userLongitude)
       ? { latitude: userLatitude, longitude: userLongitude }
       : null;
+  const radiusParam = searchParams.get("radius");
+  const radius = radiusParam === null ? Number.NaN : Number(radiusParam);
+  const radiusKm = userLocation
+    ? Number.isFinite(radius)
+      ? Math.max(0.1, Math.min(radius, 100))
+      : 0.5
+    : null;
   const limitParam = searchParams.get("limit");
   const offsetParam = searchParams.get("offset");
   const limit = limitParam === null ? Number.NaN : Number(limitParam);
@@ -26,6 +33,7 @@ export async function GET(request: Request) {
     filters,
     limit: Number.isFinite(limit) ? limit : 100,
     location: searchParams.get("location"),
+    maxRadiusKm: radiusKm,
     offset: Number.isFinite(offset) ? offset : 0,
     query: searchParams.get("q"),
     sort: searchParams.get("sort"),

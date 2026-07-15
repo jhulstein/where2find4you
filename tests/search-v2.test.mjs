@@ -411,6 +411,21 @@ test("near-me search strictly filters by radius before sponsorship", () => {
   assert.equal(ids.includes("sponsored-bergen-restaurant"), false);
 });
 
+test("near-me search supports a 500 meter radius", () => {
+  const results = searchPlaceRecords(places, {
+    category: "all",
+    limit: 50,
+    maxRadiusKm: 0.5,
+    query: "",
+    userLocation: oslo,
+  });
+  const ids = results.results.map((result) => result.id);
+
+  assert.equal(ids.includes("oslo-coffee-roasters"), true);
+  assert.equal(ids.includes("quiet-corner-cafe"), false);
+  assert.equal(ids.includes("bergen-kafe"), false);
+});
+
 test("keyword search excludes places that do not match the query text", () => {
   const ids = idsFor("mat", {
     userLocation: oslo,

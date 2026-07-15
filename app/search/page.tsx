@@ -1,4 +1,5 @@
 import { HeartHandshake, SlidersHorizontal } from "lucide-react";
+import { AroundYouControl } from "@/components/AroundYouControl";
 import { CategoryFilter } from "@/components/CategoryFilter";
 import { CityPicker } from "@/components/CityPicker";
 import { PlaceCard } from "@/components/PlaceCard";
@@ -25,9 +26,12 @@ type SearchPageProps = {
     lat?: string | string[];
     location?: string | string[];
     lon?: string | string[];
+    radius?: string | string[];
     sort?: "relevance" | "popularity" | "newest";
   }>;
 };
+
+const defaultAroundYouRadiusKm = 0.5;
 
 function firstParam(value: string | string[] | undefined) {
   return Array.isArray(value) ? value[0] : value;
@@ -41,6 +45,28 @@ function parseCoordinate(value: string | string[] | undefined) {
   const coordinate = Number(firstParam(value));
 
   return Number.isFinite(coordinate) ? coordinate : null;
+}
+
+function parseRadiusKm(value: string | string[] | undefined, fallback: number | null) {
+  const radius = Number(firstParam(value));
+
+  if (!Number.isFinite(radius)) {
+    return fallback;
+  }
+
+  return Math.max(0.1, Math.min(radius, 100));
+}
+
+function formatRadiusKm(radiusKm: number | null) {
+  if (!radiusKm) {
+    return "";
+  }
+
+  if (radiusKm < 1) {
+    return `${Math.round(radiusKm * 1000)} m`;
+  }
+
+  return Number.isInteger(radiusKm) ? `${radiusKm} km` : `${radiusKm.toFixed(1)} km`;
 }
 
 function searchFiltersFromParams(params: Awaited<SearchPageProps["searchParams"]>) {
@@ -74,11 +100,15 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
     !requestedLocation && latitude !== null && longitude !== null
       ? { latitude, longitude }
       : null;
+  const radiusKm = userLocation
+    ? parseRadiusKm(params.radius, defaultAroundYouRadiusKm)
+    : null;
   const searchResult = await searchPlaces({
     category: requestedCategory,
     filters: activeFilters,
     limit: 250,
     location: requestedLocation,
+    maxRadiusKm: radiusKm,
     query: rawQuery,
     sort: requestedSort,
     userLocation,
@@ -89,6 +119,8 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
   const sort = searchResult.sort;
   const cityForSearch = searchResult.city;
   const activeUserLocation = searchResult.userLocationAvailable ? userLocation : null;
+  const activeRadiusKm = activeUserLocation ? radiusKm : null;
+  const activeRadiusLabel = formatRadiusKm(activeRadiusKm);
   const sorted = searchResult.results;
   const promotedProducts = getPromotedProductsForContext({
     category: category === "all" ? null : category,
@@ -119,12 +151,14 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
   const cityLabel = cityForSearch
     ? `${cityForSearch.name}, ${cityForSearch.country}`
     : activeUserLocation
-      ? "Near your position"
+      ? `Around you${activeRadiusLabel ? `, within ${activeRadiusLabel}` : ""}`
     : "All pilot cities";
   const activeFilter = searchFilterOptions.find((option) => option.id === category);
   const categoryLabel = category === "restaurants" ? "Food & drink" : activeFilter?.label ?? "Places";
   const pageTitle = query
     ? `Results for “${query}”`
+    : activeUserLocation
+      ? "Places around you"
     : category === "all"
       ? "Explore places"
       : `${categoryLabel} ${
@@ -147,6 +181,15 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
             latitude={activeUserLocation?.latitude ?? null}
             location={activeUserLocation ? undefined : cityForSearch?.slug ?? requestedLocation}
             longitude={activeUserLocation?.longitude ?? null}
+            radiusKm={activeRadiusKm}
+            sort={sort}
+          />
+          <AroundYouControl
+            activeRadiusKm={activeRadiusKm}
+            category={category}
+            className="mt-3"
+            filters={filters}
+            query={query}
             sort={sort}
           />
           <div className="mt-4 grid gap-3 lg:grid-cols-[1fr_220px_220px]">
@@ -156,11 +199,14 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
               latitude={activeUserLocation?.latitude ?? null}
               location={activeUserLocation ? undefined : cityForSearch?.slug ?? requestedLocation}
               longitude={activeUserLocation?.longitude ?? null}
+              query={query}
+              radiusKm={activeRadiusKm}
               sort={sort}
             />
             <form action="/search" className="flex gap-2">
               <input type="hidden" name="category" value={category} />
               {filterHiddenInputs("location")}
+              {query ? <input type="hidden" name="q" value={query} /> : null}
               <input type="hidden" name="sort" value={sort} />
               <input
                 name="location"
@@ -178,6 +224,8 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
               latitude={activeUserLocation?.latitude ?? null}
               location={activeUserLocation ? null : cityForSearch?.slug ?? requestedLocation ?? null}
               longitude={activeUserLocation?.longitude ?? null}
+              query={query}
+              radiusKm={activeRadiusKm}
               sort={sort}
             />
           </div>
@@ -187,6 +235,7 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
             cities={cities}
             filters={filters}
             popularCities={popularCities}
+            query={query}
             sort={sort}
           />
         </div>
@@ -218,6 +267,7 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
         <PlaceMap
           places={mapPlaces}
           city={activeUserLocation ? undefined : cityForSearch ?? undefined}
+          defaultLocateRadiusKm={activeRadiusKm ?? defaultAroundYouRadiusKm}
           initialUserLocation={activeUserLocation}
           preferUserLocation={Boolean(activeUserLocation)}
           showLocationControl
@@ -226,7 +276,7 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
             cityForSearch
               ? `Use your position when available, or browse ${cityForSearch.name}. ${mapPlaces.length} shown on map.`
               : userLocation
-                ? `Centered on your position. ${mapPlaces.length} shown on map.`
+                ? `Centered on your position${activeRadiusLabel ? ` within ${activeRadiusLabel}` : ""}. ${mapPlaces.length} shown on map.`
               : `Use your position when available. ${mapPlaces.length} shown on map across pilot cities.`
           }
           heightClassName="h-[420px] sm:h-[520px] lg:h-[620px]"
@@ -243,7 +293,7 @@ export default async function SearchPage({ searchParams }: SearchPageProps) {
 
         {sorted.length > 0 ? (
           <SearchResultsList
-            key={`${query}-${category}-${cityForSearch?.slug ?? "all"}-${filters.join(",")}-${sort}`}
+            key={`${query}-${category}-${cityForSearch?.slug ?? "all"}-${activeRadiusKm ?? "no-radius"}-${filters.join(",")}-${sort}`}
             inlineAd={
               promotedProducts.length > 0 ? (
                 <ProductAdSlot

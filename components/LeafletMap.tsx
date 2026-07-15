@@ -255,6 +255,7 @@ function PlacePopupContent({
 
 export default function LeafletMap({
   city,
+  defaultLocateRadiusKm = null,
   initialUserLocation = null,
   places,
   preferUserLocation = false,
@@ -308,6 +309,9 @@ export default function LeafletMap({
 
           searchParams.set("lat", nextPosition[0].toFixed(6));
           searchParams.set("lon", nextPosition[1].toFixed(6));
+          if (!searchParams.has("radius") && Number.isFinite(defaultLocateRadiusKm)) {
+            searchParams.set("radius", String(defaultLocateRadiusKm));
+          }
           searchParams.delete("location");
 
           window.location.assign(`/search?${searchParams.toString()}`);
@@ -326,7 +330,7 @@ export default function LeafletMap({
       },
       { enableHighAccuracy: true, maximumAge: 60000, timeout: 8000 },
     );
-  }, [updateSearchOnLocate]);
+  }, [defaultLocateRadiusKm, updateSearchOnLocate]);
 
   const copyAddress = useCallback(async (placeId: string, address: string) => {
     if (!address || !("clipboard" in navigator)) {

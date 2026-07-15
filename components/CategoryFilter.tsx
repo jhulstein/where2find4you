@@ -11,6 +11,8 @@ type CategoryFilterProps = {
   latitude?: number | null;
   location?: string;
   longitude?: number | null;
+  query?: string;
+  radiusKm?: number | null;
   sort?: string;
 };
 
@@ -20,6 +22,8 @@ export function CategoryFilter({
   latitude = null,
   location,
   longitude = null,
+  query = "",
+  radiusKm = null,
   sort = "relevance",
 }: CategoryFilterProps) {
   const router = useRouter();
@@ -53,6 +57,12 @@ export function CategoryFilter({
     if (hasUserLocation) {
       searchParams.set("lat", String(latitude));
       searchParams.set("lon", String(longitude));
+      if (Number.isFinite(radiusKm)) {
+        searchParams.set("radius", String(radiusKm));
+      }
+    }
+    if (query) {
+      searchParams.set("q", query);
     }
     searchParams.set("category", categoryId);
     for (const filter of nextFilters) {

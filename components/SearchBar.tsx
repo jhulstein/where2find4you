@@ -14,6 +14,7 @@ type SearchBarProps = {
   latitude?: number | null;
   location?: string;
   longitude?: number | null;
+  radiusKm?: number | null;
   sort?: string;
 };
 
@@ -24,6 +25,7 @@ export function SearchBar({
   latitude = null,
   location,
   longitude = null,
+  radiusKm = null,
   sort,
 }: SearchBarProps) {
   const router = useRouter();
@@ -46,6 +48,9 @@ export function SearchBar({
     if (Number.isFinite(latitude) && Number.isFinite(longitude)) {
       searchParams.set("lat", String(latitude));
       searchParams.set("lon", String(longitude));
+      if (Number.isFinite(radiusKm)) {
+        searchParams.set("radius", String(radiusKm));
+      }
     }
     if (category) {
       searchParams.set("category", category);
@@ -86,6 +91,9 @@ export function SearchBar({
           <>
             <input type="hidden" name="lat" value={String(latitude)} />
             <input type="hidden" name="lon" value={String(longitude)} />
+            {Number.isFinite(radiusKm) ? (
+              <input type="hidden" name="radius" value={String(radiusKm)} />
+            ) : null}
           </>
         ) : null}
         {category ? <input type="hidden" name="category" value={category} /> : null}

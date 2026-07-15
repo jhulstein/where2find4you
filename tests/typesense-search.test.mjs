@@ -109,6 +109,17 @@ test("Typesense query builder applies normalization, field priorities and WiFi i
   assert.equal(parameters.prefix, "true");
 });
 
+test("Typesense query builder preserves sub-kilometer near-me radius", () => {
+  const parameters = buildTypesenseSearchParameters({
+    category: "all",
+    query: "",
+    radiusKm: 0.5,
+    userLocation: oslo,
+  });
+
+  assert.match(parameters.filter_by, /location:\(59\.9139, 10\.7522, 0\.5 km\)/);
+});
+
 test("Typesense query builder preserves filters and pagination", () => {
   const parameters = buildTypesenseSearchParameters({
     category: "restaurants",

@@ -192,7 +192,7 @@ function buildSelectorQuery(
   limit: number,
 ) {
   const radiusMeters = input.radiusKm
-    ? Math.trunc(Math.max(1, Math.min(input.radiusKm, 100)) * 1000)
+    ? Math.trunc(Math.max(0.1, Math.min(input.radiusKm, 100)) * 1000)
     : input.category === "all"
       ? 3500
       : 5500;

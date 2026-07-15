@@ -11,6 +11,7 @@ type CityPickerProps = {
   cities: City[];
   filters: string[];
   popularCities: City[];
+  query?: string;
   sort: string;
 };
 
@@ -20,6 +21,7 @@ export function CityPicker({
   cities,
   filters,
   popularCities,
+  query = "",
   sort,
 }: CityPickerProps) {
   const router = useRouter();
@@ -36,6 +38,9 @@ export function CityPicker({
 
     searchParams.set("location", citySlug);
     searchParams.set("category", category);
+    if (query) {
+      searchParams.set("q", query);
+    }
     for (const filter of filters) {
       searchParams.append("filter", filter);
     }

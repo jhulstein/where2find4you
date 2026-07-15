@@ -9,6 +9,7 @@ import {
   Search,
   Sparkles,
 } from "lucide-react";
+import { AroundYouControl } from "@/components/AroundYouControl";
 import { BusinessCTA } from "@/components/BusinessCTA";
 import { PlaceCard } from "@/components/PlaceCard";
 import { PlaceMap } from "@/components/PlaceMap";
@@ -45,6 +46,7 @@ export default function Home() {
               </p>
               <div className="mt-8 max-w-4xl">
                 <SearchBar />
+                <AroundYouControl className="mt-3" />
               </div>
               <div className="mt-5 flex flex-wrap gap-2">
                 {popularCities.map((city) => (
